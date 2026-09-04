@@ -1,0 +1,504 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { View, FlatList, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, Animated as RNAnimated, ScrollView, Modal, Clipboard } from 'react-native';
+import { YStack, XStack, Text, Avatar, Spinner } from 'tamagui';
+import { ChevronLeft, Phone, Video, Send, Mic, Image as ImageIcon, Smile, Check, CheckCheck, Reply, Languages, X, Paperclip, Clock, FileText, Banknote, CheckSquare, Zap, SquareCheck, Square, Building, Wallet, Copy, QrCode } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { GradientBackground } from '../../src/components/ThemeComponents';
+import AnimatedEmoji from '../../src/components/AnimatedEmoji';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInUp, FadeInDown, Layout } from 'react-native-reanimated';
+import { useChat } from '../../src/context/ChatContext';
+import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { Swipeable } from 'react-native-gesture-handler';
+
+export default function ChatThreadScreen() {
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
+  const { messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem } = useChat();
+  const chatMessages = messages[id as string] || [];
+  
+  const [inputText, setInputText] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [translatedMessages, setTranslatedMessages] = useState<Record<string, boolean>>({});
+  const [showScheduleOptions, setShowScheduleOptions] = useState(false);
+  const [moneyRequestMode, setMoneyRequestMode] = useState(false);
+  const [moneyAmount, setMoneyAmount] = useState('');
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'bank' | 'crypto'>('bank');
+  const [activePaymentMsg, setActivePaymentMsg] = useState<any>(null);
+  
+  const flatListRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    // typing event throttle
+    if (inputText.length > 0) {
+      sendTypingEvent(id as string, true);
+    } else {
+      sendTypingEvent(id as string, false);
+    }
+  }, [inputText]);
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      Platform.OS !== 'web' && Haptics.notificationAsync();
+      sendMessage(id as string, '', 'image', result.assets[0].uri, replyingTo?.id);
+      setReplyingTo(null);
+    }
+  };
+
+  const pickDocument = async () => {
+    let result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: true
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      Platform.OS !== 'web' && Haptics.notificationAsync();
+      sendMessage(id as string, result.assets[0].name, 'document', result.assets[0].uri, replyingTo?.id, result.assets[0].name);
+      setReplyingTo(null);
+    }
+  };
+
+  const sendMoneyRequest = () => {
+    if(!moneyAmount) return;
+    Platform.OS !== 'web' && Haptics.notificationAsync();
+    sendMessage(id as string, 'Payment Request', 'money_request', undefined, undefined, undefined, undefined, { amount: moneyAmount, currency: '৳' });
+    setMoneyAmount('');
+    setMoneyRequestMode(false);
+  };
+
+  const sendChecklist = () => {
+    Platform.OS !== 'web' && Haptics.impactAsync();
+    sendMessage(id as string, 'Project Milestones', 'checklist', undefined, undefined, undefined, undefined, { 
+      items: [ {id: 1, text: 'Phase 1 Setup', done: true}, {id: 2, text: 'UI Design', done: false}, {id: 3, text: 'Final Delivery', done: false} ] 
+    });
+  };
+
+  const startRecording = async () => {
+    try {
+      Platform.OS !== 'web' && Haptics.impactAsync();
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const { recording: newRec } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(newRec);
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Failed to start recording', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+    setIsRecording(false);
+    Platform.OS !== 'web' && Haptics.impactAsync();
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+      if (uri) {
+        sendMessage(id as string, '', 'audio', uri, replyingTo?.id);
+        setReplyingTo(null);
+      }
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+    }
+  };
+
+  const handleSendMessage = (scheduledFor?: Date) => {
+    if (!inputText.trim()) return;
+    Platform.OS !== 'web' && Haptics.impactAsync();
+    sendMessage(id as string, inputText, 'text', undefined, replyingTo?.id, undefined, scheduledFor);
+    setInputText('');
+    setReplyingTo(null);
+    setShowScheduleOptions(false);
+  };
+
+  const toggleTranslation = (msgId: string) => {
+    Platform.OS !== 'web' && Haptics.selectionAsync();
+    setTranslatedMessages(prev => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
+  const renderRightActions = (progress: any, dragX: any, item: any) => {
+    const scale = dragX.interpolate({
+      inputRange: [-50, 0],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+    return (
+      <View style={{ width: 60, justifyContent: 'center', alignItems: 'center' }}>
+        <RNAnimated.View style={{ transform: [{ scale }] }}>
+          <View style={{ backgroundColor: 'rgba(0,94,184,0.1)', padding: 10, borderRadius: 20 }}>
+            <Reply color="#005eb8" size={20} />
+          </View>
+        </RNAnimated.View>
+      </View>
+    );
+  };
+
+  const renderItem = ({ item: msg }: { item: any }) => {
+    const isTranslated = translatedMessages[msg.id];
+    
+    return (
+      <Swipeable
+        renderRightActions={(prog, drag) => renderRightActions(prog, drag, msg)}
+        onSwipeableRightOpen={() => {
+          Platform.OS !== 'web' && Haptics.impactAsync();
+          setReplyingTo(msg);
+        }}
+      >
+        <Animated.View 
+          entering={FadeInDown.duration(300)} 
+          layout={Layout.springify()}
+          style={{
+            alignSelf: msg.isSender ? 'flex-end' : 'flex-start',
+            marginBottom: 16,
+            maxWidth: '85%',
+          }}
+        >
+          {msg.emoji ? (
+            <AnimatedEmoji size={120} />
+          ) : (
+            <View style={{
+              backgroundColor: msg.isSender ? '#005eb8' : '#fff',
+              padding: 12,
+              borderRadius: 20,
+              borderBottomRightRadius: msg.isSender ? 4 : 20,
+              borderBottomLeftRadius: msg.isSender ? 20 : 4,
+              shadowColor: '#000',
+              shadowOpacity: 0.05,
+              shadowRadius: 5,
+              elevation: 1,
+            }}>
+              {msg.replyToId && (
+                <View style={{ backgroundColor: 'rgba(0,0,0,0.1)', padding: 8, borderRadius: 8, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: msg.isSender ? '#fff' : '#005eb8' }}>
+                  <Text color={msg.isSender ? '#fff' : '#666'} fontSize="$2" fontWeight="bold">Replying to a message</Text>
+                </View>
+              )}
+
+              {msg.type === 'image' && msg.mediaUrl && (
+                <View style={{ marginBottom: 8, borderRadius: 10, overflow: 'hidden' }}>
+                  <img src={msg.mediaUrl} style={{ width: 200, height: 200, objectFit: 'cover' }} />
+                </View>
+              )}
+              {msg.type === 'audio' && msg.mediaUrl && (
+                <View style={{ marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
+                  <Mic color={msg.isSender ? '#fff' : '#005eb8'} size={20} />
+                  <Text color={msg.isSender ? '#fff' : '#005eb8'} marginLeft={8}>Voice Note</Text>
+                </View>
+              )}
+              {msg.type === 'document' && msg.mediaUrl && (
+                <View style={{ marginBottom: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.1)', padding: 10, borderRadius: 10 }}>
+                  <FileText color={msg.isSender ? '#fff' : '#005eb8'} size={24} />
+                  <Text color={msg.isSender ? '#fff' : '#333'} marginLeft={8} numberOfLines={1} flex={1} fontWeight="bold">
+                    {msg.fileName || 'Document'}
+                  </Text>
+                </View>
+              )}
+              {msg.type === 'money_request' && msg.metadata && (
+                <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: 12, minWidth: 200, alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#eee' }}>
+                  <View style={{ backgroundColor: 'rgba(0, 94, 184, 0.1)', padding: 12, borderRadius: 50, marginBottom: 8 }}>
+                    <Banknote color="#005eb8" size={32} />
+                  </View>
+                  <Text color="#666" fontSize="$3">Payment Request</Text>
+                  <Text color="#333" fontWeight="bold" fontSize="$8" marginVertical="$2">{msg.metadata.currency}{msg.metadata.amount}</Text>
+                  <TouchableOpacity onPress={() => { setActivePaymentMsg(msg); setPaymentModalVisible(true); Platform.OS !== 'web' && Haptics.impactAsync(); }} style={{ backgroundColor: '#005eb8', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, width: '100%', alignItems: 'center' }}>
+                    <Text color="white" fontWeight="bold">Pay Now</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {msg.type === 'checklist' && msg.metadata && (
+                <View style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: 12, borderRadius: 12, marginBottom: 8, minWidth: 200 }}>
+                  <Text fontWeight="bold" marginBottom="$2" color={msg.isSender ? '#fff' : '#333'}>{msg.text}</Text>
+                  {msg.metadata.items.map((item: any) => (
+                    <TouchableOpacity key={item.id} onPress={() => { Platform.OS !== 'web' && Haptics.selectionAsync(); toggleChecklistItem(id as string, msg.id, item.id); }}>
+                      <XStack space="$2" alignItems="center" marginBottom="$2">
+                        {item.done ? <SquareCheck color={msg.isSender ? '#fff' : '#005eb8'} size={20} /> : <Square color={msg.isSender ? 'rgba(255,255,255,0.5)' : '#999'} size={20} />}
+                        <Text color={msg.isSender ? '#fff' : '#333'} textDecorationLine={item.done ? 'line-through' : 'none'}>{item.text}</Text>
+                      </XStack>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {msg.type === 'text' && msg.text && !msg.emoji ? (
+                <Text color={msg.isSender ? '#fff' : '#333'} fontSize="$4">
+                  {isTranslated ? "*(Translated)* " + msg.text + " (bengali text here)" : msg.text}
+                </Text>
+              ) : null}
+              {msg.emoji ? (
+                <AnimatedEmoji emoji={msg.text} />
+              ) : null}
+              <XStack justifyContent="flex-end" alignItems="center" marginTop="$2" space="$2">
+                {msg.status === 'scheduled' && <Clock size={12} color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#999'} />}
+                {!msg.isSender && msg.type === 'text' && (
+                  <TouchableOpacity onPress={() => toggleTranslation(msg.id)}>
+                    <Languages size={16} color="#999" />
+                  </TouchableOpacity>
+                )}
+                <Text color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#999'} fontSize="$2">
+                  {msg.time}
+                </Text>
+                {msg.isSender && (
+                  msg.status === 'read' ? <CheckCheck size={14} color="#7abeff" /> : 
+                  msg.status === 'delivered' ? <CheckCheck size={14} color="rgba(255,255,255,0.7)" /> :
+                  <Check size={14} color="rgba(255,255,255,0.7)" />
+                )}
+              </XStack>
+            </View>
+          )}
+        </Animated.View>
+      </Swipeable>
+    );
+  return (
+    <GradientBackground paddingHorizontal="$0" paddingTop="$10">
+      <XStack padding="$3" paddingTop="$5" alignItems="center" justifyContent="space-between" backgroundColor="rgba(255,255,255,0.85)" shadowColor="#000" shadowOpacity={0.05} shadowRadius={10} elevation={2} borderBottomWidth={1} borderBottomColor="rgba(0,0,0,0.05)">
+        <XStack space="$3" alignItems="center">
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 6, backgroundColor: '#f0f4f8', borderRadius: 20 }}>
+            <ChevronLeft color="#333" size={24} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push(`/profile/${id}`)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ shadowColor: '#005eb8', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}>
+              <Avatar circular size="$4" style={{ borderWidth: 2, borderColor: '#fff' }}>
+                <Avatar.Image src={`https://i.pravatar.cc/150?u=${id || 'arthur'}`} />
+                <Avatar.Fallback backgroundColor="#e6e6e6" alignItems="center" justifyContent="center">
+                  <Text color="#666" fontSize="$3" fontWeight="bold">AM</Text>
+                </Avatar.Fallback>
+              </Avatar>
+            </View>
+            <YStack marginLeft="$3">
+              <Text fontWeight="bold" fontSize="$5" color="#333">Arthur Melsn</Text>
+              <Text fontSize="$2" color={onlineUsers['1'] ? '#27ae60' : '#999'} fontWeight="500">
+                {onlineUsers['1'] ? 'Online' : 'Offline'}
+              </Text>
+            </YStack>
+          </TouchableOpacity>
+        </XStack>
+        <XStack space="$3">
+          <TouchableOpacity style={{ padding: 10, backgroundColor: 'rgba(39, 174, 96, 0.1)', borderRadius: 20 }}>
+            <Phone color="#27ae60" size={20} />
+          </TouchableOpacity>
+          <TouchableOpacity style={{ padding: 10, backgroundColor: 'rgba(0, 94, 184, 0.1)', borderRadius: 20 }}>
+            <Video color="#005eb8" size={20} />
+          </TouchableOpacity>
+        </XStack>
+      </XStack>
+
+      {/* Messages */}
+      <FlatList
+        ref={flatListRef}
+        data={chatMessages}
+        keyExtractor={item => item.id}
+        renderItem={renderItem}
+        inverted // Messages load bottom to top
+        contentContainerStyle={{ padding: 16 }}
+        showsVerticalScrollIndicator={false}
+        onEndReached={() => loadMoreMessages(id as string)}
+        onEndReachedThreshold={0.5}
+      />
+
+      {/* Payment Modal */}
+      <Modal visible={paymentModalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' }}>
+            <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
+              <Text fontWeight="bold" fontSize="$6">Make Payment</Text>
+              <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
+                <X color="#666" size={24} />
+              </TouchableOpacity>
+            </XStack>
+            
+            <View style={{ backgroundColor: '#f0f8ff', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 20 }}>
+              <Text color="#666">Amount to Pay</Text>
+              <Text fontWeight="bold" fontSize="$8" color="#005eb8">{activePaymentMsg?.metadata?.currency}{activePaymentMsg?.metadata?.amount}</Text>
+            </View>
+
+            <XStack space="$2" marginBottom="$4">
+              <TouchableOpacity onPress={() => setSelectedPaymentMethod('bank')} style={{ flex: 1, backgroundColor: selectedPaymentMethod === 'bank' ? '#005eb8' : '#f0f0f0', padding: 12, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
+                <Building color={selectedPaymentMethod === 'bank' ? '#fff' : '#666'} size={18} style={{ marginRight: 8 }} />
+                <Text color={selectedPaymentMethod === 'bank' ? '#fff' : '#666'} fontWeight="bold">US Bank</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setSelectedPaymentMethod('crypto')} style={{ flex: 1, backgroundColor: selectedPaymentMethod === 'crypto' ? '#005eb8' : '#f0f0f0', padding: 12, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
+                <Wallet color={selectedPaymentMethod === 'crypto' ? '#fff' : '#666'} size={18} style={{ marginRight: 8 }} />
+                <Text color={selectedPaymentMethod === 'crypto' ? '#fff' : '#666'} fontWeight="bold">Crypto</Text>
+              </TouchableOpacity>
+            </XStack>
+
+            {selectedPaymentMethod === 'bank' ? (
+              <View style={{ backgroundColor: '#f9f9f9', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#eee' }}>
+                <Text color="#999" fontSize="$2" marginBottom="$2">TRANSFER DETAILS (ACH/WIRE)</Text>
+                
+                <YStack space="$3">
+                  <View>
+                    <Text color="#666" fontSize="$3">Bank Name</Text>
+                    <Text fontWeight="bold" fontSize="$4">First Century Bank (via Payoneer)</Text>
+                  </View>
+                  <View>
+                    <Text color="#666" fontSize="$3">Account Holder</Text>
+                    <Text fontWeight="bold" fontSize="$4">Md Freelancer Name</Text>
+                  </View>
+                  <View>
+                    <Text color="#666" fontSize="$3">Routing Number</Text>
+                    <XStack justifyContent="space-between" alignItems="center">
+                      <Text fontWeight="bold" fontSize="$4" color="#005eb8">026073150</Text>
+                      <TouchableOpacity><Copy color="#999" size={16} /></TouchableOpacity>
+                    </XStack>
+                  </View>
+                  <View>
+                    <Text color="#666" fontSize="$3">Account Number</Text>
+                    <XStack justifyContent="space-between" alignItems="center">
+                      <Text fontWeight="bold" fontSize="$4" color="#005eb8">40291847192</Text>
+                      <TouchableOpacity><Copy color="#999" size={16} /></TouchableOpacity>
+                    </XStack>
+                  </View>
+                </YStack>
+              </View>
+            ) : (
+              <View style={{ backgroundColor: '#f9f9f9', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#eee', alignItems: 'center' }}>
+                <Text color="#999" fontSize="$2" marginBottom="$4">USDT (TRC20) WALLET ADDRESS</Text>
+                
+                <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#eee' }}>
+                  <QrCode color="#333" size={100} />
+                </View>
+                
+                <View style={{ backgroundColor: '#e6f2ff', padding: 12, borderRadius: 8, width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text color="#005eb8" fontWeight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 8 }}>TNo3...8dKj9L</Text>
+                  <TouchableOpacity><Copy color="#005eb8" size={20} /></TouchableOpacity>
+                </View>
+                <Text color="#666" fontSize="$2" marginTop="$2" textAlign="center">Send only USDT via TRC20 network to this address.</Text>
+              </View>
+            )}
+
+            <TouchableOpacity onPress={() => { Platform.OS !== 'web' && Haptics.notificationAsync(); setPaymentModalVisible(false); }} style={{ backgroundColor: '#333', padding: 16, borderRadius: 12, marginTop: 20, alignItems: 'center' }}>
+              <Text color="white" fontWeight="bold">Mark as Paid</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Input Area */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {replyingTo && (
+          <Animated.View entering={FadeInUp.duration(200)} style={{ backgroundColor: '#f9f9f9', padding: 12, borderTopWidth: 1, borderTopColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ borderLeftWidth: 4, borderLeftColor: '#005eb8', paddingLeft: 8 }}>
+              <Text color="#005eb8" fontWeight="bold" fontSize="$3">Replying to {replyingTo.isSender ? 'Yourself' : 'Arthur'}</Text>
+              <Text color="#666" fontSize="$3" numberOfLines={1}>{replyingTo.text || 'Media Message'}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setReplyingTo(null)}>
+              <X color="#999" size={20} />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+        {showScheduleOptions && (
+          <Animated.View entering={FadeInDown} style={{ backgroundColor: '#fff', padding: 16, borderTopWidth: 1, borderTopColor: '#eee' }}>
+            <Text fontWeight="bold" marginBottom={8}>Schedule Message</Text>
+            <XStack space="$2">
+              <TouchableOpacity onPress={() => handleSendMessage(new Date(Date.now() + 3600000))} style={{ padding: 10, backgroundColor: '#f0f0f0', borderRadius: 8, flex: 1, alignItems: 'center' }}>
+                <Text>In 1 Hour</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleSendMessage(new Date(Date.now() + 86400000))} style={{ padding: 10, backgroundColor: '#f0f0f0', borderRadius: 8, flex: 1, alignItems: 'center' }}>
+                <Text>Tomorrow</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowScheduleOptions(false)} style={{ padding: 10, backgroundColor: '#ffebe6', borderRadius: 8, flex: 1, alignItems: 'center' }}>
+                <Text color="red">Cancel</Text>
+              </TouchableOpacity>
+            </XStack>
+          </Animated.View>
+        )}
+        {inputText.startsWith('/') && (
+          <Animated.View entering={FadeInDown} style={{ backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee', maxHeight: 200 }}>
+            <ScrollView keyboardShouldPersistTaps="always">
+              {quickReplies.filter((r: string) => r.toLowerCase().includes(inputText.slice(1).toLowerCase())).map((reply: string, i: number) => (
+                <TouchableOpacity key={i} onPress={() => { setInputText(reply); Platform.OS !== 'web' && Haptics.selectionAsync(); }} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', flexDirection: 'row', alignItems: 'center' }}>
+                  <Zap color="#f39c12" size={16} style={{ marginRight: 8 }} />
+                  <Text>{reply}</Text>
+                </TouchableOpacity>
+              ))}
+              {inputText.length > 1 && !quickReplies.includes(inputText.slice(1)) && (
+                <TouchableOpacity onPress={() => { addQuickReply(inputText.slice(1)); setInputText(inputText.slice(1)); Platform.OS !== 'web' && Haptics.notificationAsync(); }} style={{ padding: 16, backgroundColor: '#f0f8ff', flexDirection: 'row', alignItems: 'center' }}>
+                  <Text color="#005eb8" fontWeight="bold">+ Save "{inputText.slice(1)}" as new Quick Reply</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+          </Animated.View>
+        )}
+        {moneyRequestMode && (
+          <Animated.View entering={FadeInDown} style={{ backgroundColor: '#f0f8ff', padding: 16, borderTopWidth: 1, borderTopColor: '#cce0ff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text fontWeight="bold" color="#005eb8">Request Amount (৳):</Text>
+            <XStack space="$2" alignItems="center" flex={1} marginLeft="$3">
+              <TextInput value={moneyAmount} onChangeText={setMoneyAmount} keyboardType="numeric" placeholder="0.00" style={{ flex: 1, backgroundColor: '#fff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#005eb8', fontSize: 16 }} />
+              <TouchableOpacity onPress={sendMoneyRequest} style={{ backgroundColor: '#005eb8', padding: 10, borderRadius: 8 }}>
+                <Send color="#fff" size={18} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setMoneyRequestMode(false)}>
+                <X color="#666" size={24} />
+              </TouchableOpacity>
+            </XStack>
+          </Animated.View>
+        )}
+        {/* Toolbar & Input Box */}
+        <XStack padding="$3" paddingBottom="$5" backgroundColor="#fff" alignItems="flex-end" space="$2" shadowColor="#000" shadowOpacity={0.05} shadowRadius={10} elevation={10}>
+          <TouchableOpacity onPress={() => setMoneyRequestMode(true)}>
+            <View style={{ padding: 10, backgroundColor: 'rgba(39, 174, 96, 0.15)', borderRadius: 20 }}>
+              <Banknote color="#27ae60" size={22} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={sendChecklist}>
+            <View style={{ padding: 10, backgroundColor: 'rgba(0, 94, 184, 0.15)', borderRadius: 20 }}>
+              <CheckSquare color="#005eb8" size={22} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={pickDocument}>
+            <View style={{ padding: 10, backgroundColor: 'rgba(155, 89, 182, 0.15)', borderRadius: 20 }}>
+              <Paperclip color="#8e44ad" size={22} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={pickImage}>
+            <View style={{ padding: 10, backgroundColor: 'rgba(230, 126, 34, 0.15)', borderRadius: 20 }}>
+              <ImageIcon color="#d35400" size={22} />
+            </View>
+          </TouchableOpacity>
+          <View style={{ flex: 1, backgroundColor: '#f4f7fb', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 8, minHeight: 44, maxHeight: 120, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e1e8f0' }}>
+            <TextInput
+              multiline
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Message..."
+              placeholderTextColor="#999"
+              style={{ fontSize: 16, color: '#333', flex: 1, maxHeight: 100 }}
+            />
+            <TouchableOpacity onPress={() => { setInputText('❤️'); }} style={{ marginLeft: 8 }}>
+              <Smile color="#f39c12" size={22} />
+            </TouchableOpacity>
+          </View>
+          {inputText.trim() ? (
+            <TouchableOpacity onPress={() => handleSendMessage()} onLongPress={() => setShowScheduleOptions(true)}>
+              <View style={{ padding: 12, backgroundColor: '#005eb8', borderRadius: 24, shadowColor: '#005eb8', shadowOpacity: 0.4, shadowRadius: 6, elevation: 4 }}>
+                <Send color="white" size={20} />
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPressIn={startRecording} onPressOut={stopRecording}>
+              <View style={{ padding: 12, backgroundColor: isRecording ? '#e74c3c' : '#005eb8', borderRadius: 24, transform: [{ scale: isRecording ? 1.2 : 1 }], shadowColor: '#005eb8', shadowOpacity: 0.4, shadowRadius: 6, elevation: 4 }}>
+                <Mic color="white" size={20} />
+              </View>
+            </TouchableOpacity>
+          )}
+        </XStack>
+      </KeyboardAvoidingView>
+    </GradientBackground>
+  );
+}
