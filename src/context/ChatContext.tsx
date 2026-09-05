@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MMKV } from 'react-native-mmkv';
-const storage = new MMKV();
+import { Platform } from 'react-native';
+const storage = Platform.OS === 'web' ? { set: (k,v) => { try { window.localStorage.setItem(k, v) } catch(e){} }, getString: (k) => { try { return window.localStorage.getItem(k) } catch(e){ return null; } }, delete: (k) => { try { window.localStorage.removeItem(k) } catch(e){} } } : new MMKV();
 import { supabase } from '../services/supabase';
 import { api } from '../services/api';
 import { useAuth } from './AuthContext';
