@@ -15,8 +15,26 @@ import { Image } from 'react-native';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// Color palette for contact avatars
+const AVATAR_PALETTE = [
+  { bg: '#3b82f6', ring: '#93c5fd' }, // Blue
+  { bg: '#8b5cf6', ring: '#c4b5fd' }, // Purple
+  { bg: '#0d9488', ring: '#5eead4' }, // Teal
+  { bg: '#f43f5e', ring: '#fda4af' }, // Rose / Coral
+  { bg: '#f59e0b', ring: '#fcd34d' }, // Amber
+  { bg: '#0284c7', ring: '#7dd3fc' }, // Sky
+  { bg: '#6366f1', ring: '#a5b4fc' }, // Indigo
+  { bg: '#10b981', ring: '#6ee7b7' }, // Emerald
+];
+
+const getAvatarTheme = (name: string) => {
+  if (!name) return AVATAR_PALETTE[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+};
 
 // --- Small Components for Polish ---
 
@@ -253,14 +271,22 @@ export default function CallsScreen() {
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     let Icon = PhoneOutgoing;
-    let iconColor = "#94a3b8";
+    let iconColor = "#0284c7";
+    let iconBg = "#e0f2fe";
     if (isMissed) {
       Icon = PhoneMissed;
       iconColor = "#ef4444";
+      iconBg = "#fee2e2";
     } else if (isIncoming) {
       Icon = PhoneIncoming;
       iconColor = "#10b981";
+      iconBg = "#d1fae5";
     }
+
+    const peerName = log.peer?.name || log.peer?.phone || "Unknown";
+    const initial = peerName.trim().charAt(0).toUpperCase() || 'U';
+    const avatarTheme = getAvatarTheme(peerName);
+    const hasCustomAvatar = !!log.peer?.avatar && !log.peer.avatar.includes('ui-avatars.com');
 
     const isFirst = index === 0;
     const isLast = index === totalInGroup - 1;
@@ -268,48 +294,71 @@ export default function CallsScreen() {
     return (
       <View style={[
         styles.logRowWrapper, 
-        isFirst && { borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-        isLast && { borderBottomLeftRadius: 24, borderBottomRightRadius: 24, borderBottomWidth: 0 },
+        isFirst && styles.rowFirst,
+        isLast && styles.rowLast,
         isMissed && styles.logRowMissed
       ]}>
         <XStack flex={1} alignItems="center" space="$3">
+          {/* Avatar with initial or real photo */}
           <View style={styles.avatarWrapper}>
-            <Avatar circular size="$4" style={styles.avatarBorder}>
-              <Avatar.Image src={log.peer?.avatar || `https://ui-avatars.com/api/?name=${log.peer?.name || 'U'}&background=e2e8f0&color=475569`} />
-              <Avatar.Fallback backgroundColor="$gray4" />
-            </Avatar>
-            <View style={styles.callBadge}>
-              <Icon size={10} color={iconColor} />
+            {hasCustomAvatar ? (
+              <Image 
+                source={{ uri: log.peer.avatar }} 
+                style={[styles.avatarImage, { borderColor: avatarTheme.ring }]} 
+              />
+            ) : (
+              <View style={[styles.avatarFallback, { backgroundColor: avatarTheme.bg, borderColor: avatarTheme.ring }]}>
+                <RNText style={styles.avatarInitial}>{initial}</RNText>
+              </View>
+            )}
+            <View style={[styles.callBadge, { backgroundColor: iconBg, borderColor: '#ffffff' }]}>
+              <Icon size={11} color={iconColor} strokeWidth={2.5} />
             </View>
           </View>
           
           <YStack flex={1}>
             <XStack alignItems="center" space="$2">
-              <RNText style={[styles.peerName, isMissed && { color: '#ef4444' }]} numberOfLines={1}>
-                {log.peer?.name || log.peer?.phone || "Unknown"}
+              <RNText style={[styles.peerName, isMissed && styles.peerNameMissed]} numberOfLines={1}>
+                {peerName}
               </RNText>
               {log.aiSummary && (
                 <View style={styles.aiBadge}>
-                  <LinearGradient colors={['#a7f3d0', '#5eead4']} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
-                  <Sparkles size={10} color="#047857" style={{ marginRight: 2 }} />
+                  <LinearGradient 
+                    colors={['#10b981', '#059669']} 
+                    start={{x:0,y:0}} 
+                    end={{x:1,y:1}} 
+                    style={StyleSheet.absoluteFillObject} 
+                  />
+                  <Sparkles size={10} color="#ffffff" style={{ marginRight: 3 }} />
                   <RNText style={styles.aiBadgeText}>AI</RNText>
                 </View>
               )}
             </XStack>
-            <XStack alignItems="center" space="$1.5">
-              {log.type === "video" ? <Video size={12} color="#64748b" /> : <Phone size={12} color="#64748b" />}
+            <XStack alignItems="center" space="$1.5" marginTop={3}>
+              {log.type === "video" ? <Video size={13} color="#64748b" /> : <Phone size={13} color="#64748b" />}
               <RNText style={styles.timeText}>{timeStr}</RNText>
+              {log.durationSeconds > 0 && (
+                <RNText style={styles.durationText}>
+                  • {Math.floor(log.durationSeconds / 60)}m {log.durationSeconds % 60}s
+                </RNText>
+              )}
             </XStack>
           </YStack>
         </XStack>
 
-        <XStack space="$2">
+        <XStack space="$2.5" alignItems="center">
           {log.aiSummary && (
             <TouchableOpacity 
-              style={styles.actionBtnShadow}
+              style={styles.actionBtnShadowAi}
               onPress={() => setSelectedSummary(log)}
+              activeOpacity={0.8}
             >
-              <LinearGradient colors={['#34d399', '#0d9488']} style={styles.actionBtn}>
+              <LinearGradient 
+                colors={['#10b981', '#059669']} 
+                start={{x:0,y:0}} 
+                end={{x:1,y:1}} 
+                style={styles.actionBtn}
+              >
                 <Sparkles size={16} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
@@ -321,9 +370,15 @@ export default function CallsScreen() {
               if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
               router.push({ pathname: '/(main)/call', params: { peerId: log.peer?.id || log.peer?.phone, isVideo: (log.type === 'video').toString(), isIncoming: 'false' } });
             }}
+            activeOpacity={0.8}
           >
-            <LinearGradient colors={['#3b82f6', '#005eb8']} style={styles.actionBtn}>
-              {log.type === 'video' ? <Video size={16} color="#fff" /> : <Phone size={16} color="#fff" />}
+            <LinearGradient 
+              colors={['#005eb8', '#6366f1']} 
+              start={{x:0,y:0}} 
+              end={{x:1,y:1}} 
+              style={styles.actionBtn}
+            >
+              {log.type === 'video' ? <Video size={16} color="#fff" strokeWidth={2.2} /> : <Phone size={16} color="#fff" strokeWidth={2.2} />}
             </LinearGradient>
           </TouchableOpacity>
         </XStack>
@@ -333,30 +388,37 @@ export default function CallsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Gradient */}
+      {/* Background Gradient - richer presence at top fading to clean soft surface */}
       <LinearGradient
-        colors={['#f4f8ff', '#f8f5ff']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={['#dbeafe', '#eef2ff', '#f8fafc']}
+        locations={[0, 0.28, 0.7]}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
       
-      {/* Subtle Background Blobs */}
+      {/* Decorative Blur Blobs */}
       <View style={[styles.blob, styles.blob1]} />
       <View style={[styles.blob, styles.blob2]} />
 
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) }]}>
         {!isSearching ? (
           <Animated.View entering={FadeInRight} exiting={FadeOutRight} style={styles.headerContent}>
-            <XStack alignItems="center" space="$2">
+            <XStack alignItems="center" space="$2.5">
               <View style={styles.logoCircle}>
                 <Image source={require('../../assets/images/logo-icon-transparent.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
               </View>
               <RNText style={styles.appTitle}>UniCom</RNText>
             </XStack>
-            <TouchableOpacity style={styles.searchBtnShadow} onPress={toggleSearch}>
-              <LinearGradient colors={['#eff6ff', '#e0e7ff']} style={styles.searchBtn}>
-                <Search color="#3b82f6" size={20} />
+            <TouchableOpacity style={styles.searchBtnShadow} onPress={toggleSearch} activeOpacity={0.85}>
+              <LinearGradient 
+                colors={['#005eb8', '#6366f1']} 
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.searchBtn}
+              >
+                <Search color="#ffffff" size={19} strokeWidth={2.2} />
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
@@ -385,35 +447,46 @@ export default function CallsScreen() {
         )}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 65, minHeight: 65, flexGrow: 0, marginBottom: 10 }} contentContainerStyle={styles.filtersContainer}>
-        {['all', 'missed', 'incoming', 'outgoing'].map((f) => {
-          const isActive = filter === f;
-          return (
-            <TouchableOpacity 
-              key={f} 
-              activeOpacity={0.8}
-              onPress={() => handleFilterChange(f)} 
-              style={[styles.filterPill, isActive && styles.filterPillActiveWrapper]}
-            >
-              {isActive && (
-                <LinearGradient
-                  colors={['#005eb8', '#6366f1']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[StyleSheet.absoluteFillObject, { borderRadius: 20 }]}
-                />
-              )}
-              <RNText style={[styles.filterText, isActive && styles.filterTextActive]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </RNText>
-              {f === 'missed' && <PulseBadge count={missedCount} />}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Filter Pills */}
+      <View style={styles.filterWrapper}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContainer}>
+          {['all', 'missed', 'incoming', 'outgoing'].map((f) => {
+            const isActive = filter === f;
+            const isMissedFilter = f === 'missed';
+            return (
+              <TouchableOpacity 
+                key={f} 
+                activeOpacity={0.85}
+                onPress={() => handleFilterChange(f)} 
+                style={[
+                  styles.filterPill, 
+                  isActive ? (isMissedFilter ? styles.filterPillActiveMissed : styles.filterPillActive) : styles.filterPillInactive
+                ]}
+              >
+                {isActive && (
+                  <LinearGradient
+                    colors={isMissedFilter ? ['#ef4444', '#f43f5e'] : ['#005eb8', '#6366f1']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[StyleSheet.absoluteFillObject, { borderRadius: 24 }]}
+                  />
+                )}
+                <RNText style={[styles.filterText, isActive && styles.filterTextActive, !isActive && isMissedFilter && missedCount > 0 && { color: '#ef4444' }]}>
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                </RNText>
+                {isMissedFilter && <PulseBadge count={missedCount} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
+      {/* Call Log Scroll View */}
       <ScrollView 
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom + 120, 140) }
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#005eb8" />}
       >
@@ -423,8 +496,8 @@ export default function CallsScreen() {
           <Animated.View entering={FadeInUp.duration(600).delay(200)}>
             <YStack alignItems="center" justifyContent="center" marginTop="$10" space="$4">
               <View style={styles.emptyIconContainer}>
-                <LinearGradient colors={['#e0e7ff', '#f3e8ff']} style={StyleSheet.absoluteFillObject} />
-                <PhoneMissed color="#8b5cf6" size={32} />
+                <LinearGradient colors={['#dbeafe', '#e0e7ff']} style={StyleSheet.absoluteFillObject} />
+                <PhoneMissed color="#6366f1" size={34} strokeWidth={2} />
               </View>
               <YStack alignItems="center" space="$1">
                 <RNText style={styles.emptyTitle}>No calls found</RNText>
@@ -448,14 +521,17 @@ export default function CallsScreen() {
             });
 
             return Object.entries(groups).filter(([_, items]) => items.length > 0).map(([groupName, groupLogs], groupIndex) => (
-              <YStack key={groupName} marginBottom="$5">
-                <XStack alignItems="center" marginBottom={12} marginLeft={16}>
+              <View key={groupName} style={styles.groupCardWrapper}>
+                {/* Group Header Label */}
+                <XStack alignItems="center" marginBottom={12} marginLeft={4}>
                   <View style={styles.sectionDot} />
                   <RNText style={styles.sectionTitle}>{groupName}</RNText>
                 </XStack>
+                
+                {/* Group Card with real soft drop shadow */}
                 <View style={styles.cardContainer}>
                   {groupLogs.map((log: any, index: number) => (
-                    <Animated.View key={log.id} entering={FadeInUp.delay((groupIndex * 10 + index) * 40).springify()}>
+                    <Animated.View key={log.id} entering={FadeInUp.delay((groupIndex * 10 + index) * 35).springify()}>
                       {Platform.OS === 'web' ? (
                         renderRow(log, index, groupLogs.length)
                       ) : (
@@ -466,22 +542,22 @@ export default function CallsScreen() {
                     </Animated.View>
                   ))}
                 </View>
-              </YStack>
+              </View>
             ));
           })()
         )}
       </ScrollView>
 
       {/* FAB */}
-      <View style={[styles.fabContainer, { bottom: Math.max(insets.bottom + 100, 120) }]}>
+      <View style={[styles.fabContainer, { bottom: Math.max(insets.bottom + 115, 125) }]}>
         <Animated.View style={[styles.fabGlow, fabGlowStyle]} />
         <AnimatedPressable 
           style={fabAnimatedStyle}
           onPressIn={handleFabPressIn}
           onPressOut={handleFabPressOut}
         >
-          <LinearGradient colors={['#005eb8', '#a855f7']} style={styles.fab} start={{x:0, y:0}} end={{x:1, y:1}}>
-            <Grid3x3 color="#fff" size={24} />
+          <LinearGradient colors={['#005eb8', '#6366f1']} style={styles.fab} start={{x:0, y:0}} end={{x:1, y:1}}>
+            <Grid3x3 color="#fff" size={24} strokeWidth={2.3} />
           </LinearGradient>
         </AnimatedPressable>
       </View>
@@ -492,38 +568,40 @@ export default function CallsScreen() {
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setSelectedSummary(null)} activeOpacity={1} />
           <Animated.View entering={SlideInDown.springify().damping(15)} exiting={SlideOutDown} style={[styles.bottomSheet, { paddingBottom: Math.max(insets.bottom + 20, 24) }]}>
             
-            <LinearGradient colors={['#f3e8ff', '#ffffff']} locations={[0, 0.4]} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 28, borderTopRightRadius: 28 }]} />
+            <LinearGradient colors={['#eef2ff', '#ffffff']} locations={[0, 0.35]} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: 28, borderTopRightRadius: 28 }]} />
             
             <View style={styles.sheetHandle} />
-            <XStack justifyContent="space-between" alignItems="center" marginBottom="$5" paddingHorizontal="$4" zIndex={2}>
+            <XStack justifyContent="space-between" alignItems="center" marginBottom="$4" paddingHorizontal="$4" zIndex={2}>
               <XStack space="$3" alignItems="center">
                 <View style={styles.sheetSparkleBadge}>
-                  <LinearGradient colors={['#8b5cf6', '#ec4899']} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={['#10b981', '#059669']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
                   <Sparkles color="#fff" size={20} />
                 </View>
                 <YStack>
-                  <RNText style={styles.sheetTitle}>AI Summary</RNText>
-                  <RNText style={styles.sheetSubtitle}>Call with {selectedSummary?.peer?.name}</RNText>
+                  <RNText style={styles.sheetTitle}>AI Call Summary</RNText>
+                  <RNText style={styles.sheetSubtitle}>Call with {selectedSummary?.peer?.name || 'Contact'}</RNText>
                 </YStack>
               </XStack>
-              <TouchableOpacity onPress={() => setSelectedSummary(null)}>
-                <X color="#94a3b8" size={24} />
+              <TouchableOpacity onPress={() => setSelectedSummary(null)} style={styles.sheetCloseIconBtn}>
+                <X color="#64748b" size={20} strokeWidth={2.5} />
               </TouchableOpacity>
             </XStack>
             
-            <ScrollView style={{ maxHeight: SCREEN_HEIGHT * 0.5, paddingHorizontal: 16 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: SCREEN_HEIGHT * 0.45, paddingHorizontal: 16 }} showsVerticalScrollIndicator={false}>
               {selectedSummary?.aiSummary ? (
-                <RNText style={styles.summaryText}>{selectedSummary.aiSummary}</RNText>
+                <View style={styles.summaryBox}>
+                  <RNText style={styles.summaryText}>{selectedSummary.aiSummary}</RNText>
+                </View>
               ) : (
                 <YStack alignItems="center" paddingVertical="$6" space="$3">
-                  <FileText color="#cbd5e1" size={40} style={{ marginBottom: 8 }} />
+                  <FileText color="#cbd5e1" size={44} style={{ marginBottom: 8 }} />
                   <RNText style={styles.emptySub}>No AI Summary was generated for this call.</RNText>
                 </YStack>
               )}
             </ScrollView>
             
             <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setSelectedSummary(null)}>
-              <RNText style={styles.sheetCloseBtnText}>Close</RNText>
+              <RNText style={styles.sheetCloseBtnText}>Done</RNText>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -534,58 +612,477 @@ export default function CallsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f5ff' },
-  blob: { position: 'absolute', borderRadius: 999 },
-  blob1: { width: 400, height: 400, backgroundColor: 'rgba(0, 94, 184, 0.05)', top: -100, right: -100, transform: [{ scale: 1.5 }] },
-  blob2: { width: 300, height: 300, backgroundColor: 'rgba(124, 58, 237, 0.04)', bottom: 100, left: -50, transform: [{ scale: 1.5 }] },
-  header: { paddingHorizontal: 20, paddingBottom: 16, zIndex: 10 },
-  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 44 },
-  logoCircle: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(0,94,184, 0.1)', alignItems: 'center', justifyContent: 'center' },
-  appTitle: { fontSize: 26, fontWeight: '900', color: '#0f172a', letterSpacing: -0.5, textShadowColor: 'rgba(0,0,0,0.05)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
-  searchBtnShadow: { shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 },
-  searchBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 22, paddingHorizontal: 16, height: 44, shadowColor: '#005eb8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6, borderWidth: 1, borderColor: '#eff6ff' },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 16, color: '#0f172a', fontWeight: '500', outlineStyle: 'none' } as any,
-  cancelText: { color: '#005eb8', fontWeight: '600', fontSize: 15 },
-  filtersContainer: { paddingHorizontal: 20, paddingBottom: 16, alignItems: 'center' },
-  filterPill: { paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#ffffff', borderRadius: 24, borderWidth: 1, borderColor: '#e2e8f0', marginRight: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2, height: 40 },
-  filterPillActiveWrapper: { borderColor: 'transparent', shadowColor: '#005eb8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 6 },
-  filterText: { color: '#64748b', fontWeight: '600', fontSize: 14, letterSpacing: 0.2 },
-  filterTextActive: { color: '#ffffff', zIndex: 1 },
-  missedBadgeContainer: { marginLeft: 8, position: 'relative', width: 20, height: 20, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
-  missedBadgeGlow: { position: 'absolute', width: 20, height: 20, borderRadius: 10, backgroundColor: '#ef4444' },
-  missedBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fff' },
-  missedBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 120 },
-  sectionDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#005eb8', marginRight: 8 },
-  sectionTitle: { fontSize: 13, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 },
-  cardContainer: { backgroundColor: '#ffffff', borderRadius: 24, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.15, shadowRadius: 30, elevation: 10, borderWidth: 1, borderColor: '#f8fafc', overflow: 'hidden' },
-  logRowWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, paddingHorizontal: 16, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  logRowMissed: { backgroundColor: 'rgba(239, 68, 68, 0.03)' },
-  avatarBorder: { borderWidth: 2, borderColor: '#f8fafc' },
-  avatarWrapper: { position: 'relative' },
-  callBadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  peerName: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
-  aiBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden', shadowColor: '#10b981', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
-  aiBadgeText: { fontSize: 10, fontWeight: '800', color: '#064e3b', marginLeft: 2 },
-  timeText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
-  actionBtnShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 },
-  actionBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  deleteActionContainer: { width: 80, height: '100%', backgroundColor: '#ef4444' },
-  deleteAction: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyIconContainer: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#8b5cf6', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b' },
-  emptySub: { fontSize: 14, color: '#64748b' },
-  fabContainer: { position: 'absolute', right: 24, zIndex: 10 },
-  fabGlow: { position: 'absolute', top: -10, left: -10, right: -10, bottom: -10, borderRadius: 40, backgroundColor: 'rgba(0, 94, 184, 0.4)', filter: 'blur(15px)' as any },
-  fab: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', shadowColor: '#005eb8', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 12 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.4)', justifyContent: 'flex-end' },
-  bottomSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 16, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 24, overflow: 'hidden' },
-  sheetHandle: { width: 48, height: 5, backgroundColor: '#cbd5e1', borderRadius: 3, alignSelf: 'center', marginBottom: 20, zIndex: 2 },
-  sheetSparkleBadge: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#ec4899', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
-  sheetTitle: { fontSize: 22, fontWeight: '800', color: '#0f172a' },
-  sheetSubtitle: { fontSize: 14, color: '#64748b', fontWeight: '500' },
-  summaryText: { fontSize: 16, color: '#334155', lineHeight: 26, fontWeight: '400' },
-  sheetCloseBtn: { marginTop: 24, marginHorizontal: 16, paddingVertical: 16, borderRadius: 16, borderWidth: 1.5, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#f8fafc' },
-  sheetCloseBtnText: { color: '#475569', fontWeight: '700', fontSize: 16 }
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  blob: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+  blob1: {
+    width: 360,
+    height: 360,
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    top: -80,
+    right: -80,
+  },
+  blob2: {
+    width: 280,
+    height: 280,
+    backgroundColor: 'rgba(99, 102, 241, 0.06)',
+    bottom: 120,
+    left: -60,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    zIndex: 10,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 44,
+  },
+  logoCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#005eb8',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  appTitle: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#0f172a',
+    letterSpacing: -0.5,
+  },
+  searchBtnShadow: {
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  searchBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    height: 44,
+    shadowColor: '#005eb8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 15,
+    color: '#0f172a',
+    fontWeight: '500',
+    outlineStyle: 'none',
+  } as any,
+  cancelText: {
+    color: '#005eb8',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  filterWrapper: {
+    marginBottom: 8,
+  },
+  filtersContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  filterPill: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 24,
+    marginRight: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 40,
+  },
+  filterPillInactive: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  filterPillActive: {
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  filterPillActiveMissed: {
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  filterText: {
+    color: '#64748b',
+    fontWeight: '700',
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
+  filterTextActive: {
+    color: '#ffffff',
+    zIndex: 1,
+  },
+  missedBadgeContainer: {
+    marginLeft: 8,
+    position: 'relative',
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  missedBadgeGlow: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ef4444',
+  },
+  missedBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+  },
+  missedBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 6,
+  },
+  groupCardWrapper: {
+    marginBottom: 20,
+  },
+  sectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#005eb8',
+    marginRight: 8,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  cardContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    overflow: 'hidden',
+  },
+  logRowWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  rowFirst: {
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+  },
+  rowLast: {
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    borderBottomWidth: 0,
+  },
+  logRowMissed: {
+    backgroundColor: 'rgba(239, 68, 68, 0.035)',
+  },
+  avatarWrapper: {
+    position: 'relative',
+    width: 46,
+    height: 46,
+  },
+  avatarFallback: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImage: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+  },
+  avatarInitial: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  callBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  peerName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+    maxWidth: 160,
+  },
+  peerNameMissed: {
+    color: '#ef4444',
+  },
+  aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  aiBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  timeText: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  durationText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  actionBtnShadow: {
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionBtnShadowAi: {
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteActionContainer: {
+    width: 80,
+    height: '100%',
+    backgroundColor: '#ef4444',
+  },
+  deleteAction: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyIconContainer: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  emptySub: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  fabContainer: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 10,
+  },
+  fabGlow: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    borderRadius: 40,
+    backgroundColor: 'rgba(99, 102, 241, 0.35)',
+    filter: 'blur(14px)' as any,
+  },
+  fab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 16,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 24,
+    overflow: 'hidden',
+  },
+  sheetHandle: {
+    width: 44,
+    height: 5,
+    backgroundColor: '#cbd5e1',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 16,
+    zIndex: 2,
+  },
+  sheetSparkleBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  sheetSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  sheetCloseIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  summaryText: {
+    fontSize: 15,
+    color: '#334155',
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+  sheetCloseBtn: {
+    marginTop: 20,
+    marginHorizontal: 16,
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: 'center',
+    backgroundColor: '#005eb8',
+    shadowColor: '#005eb8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  sheetCloseBtnText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
 });
