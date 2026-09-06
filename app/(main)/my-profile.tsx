@@ -12,18 +12,20 @@ import {
   Unlock, Camera, Edit2, X, Check, QrCode, Phone as PhoneIcon,
   Info, Eye, Image as ImageIcon, CheckCheck, Database, Globe,
   CreditCard, HelpCircle, ShieldAlert, Sparkles, Zap, Lock,
-  UserX, ChevronDown, ChevronUp, Shield, MessageSquare, Users
+  UserX, ChevronDown, ChevronUp, Shield, MessageSquare, Users,
+  Clock, Infinity
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../src/components/ThemeComponents';
 import { supabase } from '../../src/services/supabase';
 import { api } from '../../src/services/api';
 import { useAuth } from '../../src/context/AuthContext';
+import { useThemeContext } from '../../src/context/ThemeContext';
 import QRCode from 'react-native-qrcode-svg';
 import { useCall } from '../../src/context/CallContext';
 import Animated, {
   FadeInUp, FadeInDown, ZoomIn, SlideInRight, useSharedValue,
-  useAnimatedStyle, withSpring, interpolateColor
+  useAnimatedStyle, withSpring, interpolateColor, withRepeat, withTiming
 } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -32,54 +34,135 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COVER_HEIGHT = 180;
 const AVATAR_SIZE = 100;
 
+import { LinearGradient } from 'expo-linear-gradient';
+
+// ─── UTILITIES ──────────────────────────────────────────────────
+const ScaleButton = ({ onPress, style, children, activeScale = 0.95, haptic = Haptics.ImpactFeedbackStyle.Light, ...props }: any) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <Animated.View style={animatedStyle}>
+      <TouchableOpacity
+        activeOpacity={1}
+        style={style}
+        onPressIn={() => { scale.value = withSpring(activeScale, { damping: 15 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 15 }); }}
+        onPress={(e) => {
+          if (Platform.OS !== 'web') Haptics.impactAsync(haptic);
+          onPress?.(e);
+        }}
+        {...props}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+const ShimmerSweep = () => {
+  const transX = useSharedValue(-200);
+  useEffect(() => { transX.value = withRepeat(withTiming(400, { duration: 2500 }), -1, false); }, []);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: transX.value }] }));
+  return (
+    <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 150, left: -75, zIndex: 1, opacity: 0.5 }]}>
+      <LinearGradient colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+    </Animated.View>
+  );
+};
+
+const CountUpNumber = ({ endValue, style }: { endValue: number, style: any }) => {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    let start = 0;
+    const duration = 800;
+    const stepTime = 20;
+    const steps = duration / stepTime;
+    const increment = endValue / steps;
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= endValue) {
+        setVal(endValue);
+        clearInterval(timer);
+      } else {
+        setVal(Math.floor(start));
+      }
+    }, stepTime);
+    return () => clearInterval(timer);
+  }, [endValue]);
+  return <Text style={style}>{val}</Text>;
+};
+
 // ─── Animated Toggle ──────────────────────────────────────────────
 const AnimatedToggle = ({ value, onValueChange }: { value: boolean; onValueChange: (v: boolean) => void }) => {
   const progress = useSharedValue(value ? 1 : 0);
   useEffect(() => { progress.value = withSpring(value ? 1 : 0, { damping: 15, stiffness: 120 }); }, [value]);
+  
   const containerStyle = useAnimatedStyle(() => ({ backgroundColor: interpolateColor(progress.value, [0, 1], ['#e2e8f0', '#005eb8']) }));
   const thumbStyle = useAnimatedStyle(() => ({ transform: [{ translateX: progress.value * 20 }] }));
+  
   return (
     <TouchableOpacity activeOpacity={0.8} onPress={() => onValueChange(!value)}>
-      <Animated.View style={[styles.toggleTrack, containerStyle]}>
-        <Animated.View style={[styles.toggleThumb, thumbStyle]} />
+      <Animated.View style={[styles.toggleTrack, containerStyle, { overflow: 'hidden' }]}>
+        {value && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />}
+        <Animated.View style={[styles.toggleThumb, thumbStyle, { shadowColor: '#000', shadowOffset: {width:0, height:2}, shadowOpacity: 0.15, shadowRadius: 3 }]} />
       </Animated.View>
     </TouchableOpacity>
   );
 };
 
 // ─── Section Row Item ─────────────────────────────────────────────
+import { TouchableHighlight } from 'react-native';
+import { TOKENS } from '../../src/theme/tokens';
+
+
 const SettingRow = ({
-  icon, label, subtitle, iconBg, iconColor, rightElement, onPress, isLast = false
-}: any) => (
-  <TouchableOpacity activeOpacity={onPress ? 0.7 : 1} onPress={onPress} disabled={!onPress}>
+  icon, label, subtitle, iconColors, iconColor, rightElement, onPress, isLast = false
+}: any) => {
+  return (
+  <TouchableHighlight activeOpacity={1} underlayColor="#f1f5f9" onPress={onPress} disabled={!onPress}>
     <View style={styles.settingRow}>
         <XStack alignItems="center" space="$3" flex={1}>
-          <View style={[styles.settingIcon, { backgroundColor: iconBg }]}>
-            {React.cloneElement(icon, { color: iconColor, size: 20 })}
+          <View style={[styles.settingIcon, { overflow: 'hidden' }]}>
+            {iconColors ? (
+              <LinearGradient colors={iconColors} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+            ) : (
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#eff6ff' }]} />
+            )}
+            <View style={{ zIndex: 1 }}>{React.cloneElement(icon, { color: iconColor || '#fff', size: 20 })}</View>
           </View>
-          <View style={[ { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: !isLast ? StyleSheet.hairlineWidth : 0, borderBottomColor: '#cbd5e1' } ]}>
+          <View style={[ { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: !isLast ? StyleSheet.hairlineWidth : 0, borderBottomColor: '#e2e8f0' } ]}>
             <YStack flex={1}>
-              <Text fontWeight="600" fontSize={16} color="#0f172a">{label}</Text>
-              {subtitle && <Text fontSize={13} color="#64748b" marginTop={2}>{subtitle}</Text>}
+              <Text fontWeight="600" fontSize={16} color={TOKENS.COLORS.TEXT_PRIMARY}>{label}</Text>
+              {subtitle && <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={2}>{subtitle}</Text>}
             </YStack>
-            {rightElement ?? (onPress ? <ChevronRight color="#cbd5e1" size={20} /> : null)}
+            {rightElement ?? (onPress ? <View style={styles.chevronWrapper}><ChevronRight color={TOKENS.COLORS.TEXT_SECONDARY} size={16} /></View> : null)}
           </View>
         </XStack>
       </View>
-  </TouchableOpacity>
-);
+  </TouchableHighlight>
+  );
+};
 
 // ─── Section Card ─────────────────────────────────────────────────
 const SectionCard = ({ title, children, delay = 0 }: any) => (
   <Animated.View entering={SlideInRight.delay(delay).springify()} style={styles.sectionCard}>
-    {title && <Text style={styles.sectionTitle}>{title}</Text>}
-    <View style={styles.sectionBody}>{children}</View>
+    {title && (
+      <XStack alignItems="center" space="$2" style={styles.sectionTitleWrapper}>
+        <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={{ width: 4, height: 14, borderRadius: 2 }} />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </XStack>
+    )}
+    <View style={styles.sectionBody}>
+      <View style={styles.cardGlassTop} />
+      {children}
+    </View>
   </Animated.View>
 );
 
 // ─── Main Screen ──────────────────────────────────────────────────
 export default function MyProfileScreen() {
   const { user, updateUserProfile, logout } = useAuth();
+  const { theme, setTheme } = useThemeContext();
   const { callHistory } = useCall();
   const router = useRouter();
 
@@ -226,7 +309,8 @@ export default function MyProfileScreen() {
   const isPro = user?.plan === 'premium';
 
   return (
-    <GradientBackground style={{ flex: 1 }}>
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
 
@@ -236,39 +320,51 @@ export default function MyProfileScreen() {
             <View style={[styles.cover, { overflow: 'hidden' }]}>
               { (user?.avatar || user?.profile_picture) ? (
                 <ImageBackground source={{ uri: (user?.avatar || user?.profile_picture) }} style={StyleSheet.absoluteFillObject} blurRadius={30}>
-                  <View style={{...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,94,184,0.4)'}} />
+                  <LinearGradient colors={['rgba(0,94,184,0.4)', 'rgba(99,102,241,0.6)']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
                 </ImageBackground>
               ) : (
-                <View style={{...StyleSheet.absoluteFillObject, backgroundColor: '#005eb8'}} />
+                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY_DARK} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
               )}
+              
+              {/* Subtle bottom fade for smooth transition */}
+              <LinearGradient colors={['transparent', 'rgba(244,248,255,0.6)']} start={{x:0, y:0.5}} end={{x:0, y:1}} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 40 }} />
+
               <View style={styles.coverTopRow}>
-                <View />
-                <TouchableOpacity style={styles.coverIconBtn} onPress={() => setQrModal(true)}>
-                  <QrCode color="#fff" size={22} />
-                </TouchableOpacity>
+                <ScaleButton style={styles.coverIconBtn} onPress={() => setQrModal(true)}>
+                  <QrCode color="#fff" size={20} />
+                </ScaleButton>
               </View>
             </View>
 
             {/* Avatar overlapping cover */}
             <View style={styles.avatarArea}>
               <Animated.View entering={ZoomIn.springify().delay(200)}>
-                <TouchableOpacity onPress={pickAndUploadImage} disabled={isUploading} style={styles.avatarRing}>
-                  {isUploading ? (
-                    <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e2e8f0' }]}>
-                      <ActivityIndicator color="#005eb8" />
+                <TouchableOpacity onPress={pickAndUploadImage} disabled={isUploading}>
+                  {/* Gradient ring behind */}
+                  <View style={styles.avatarOuterRing}>
+                    <LinearGradient colors={TOKENS.GRADIENTS.AI} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                    {/* White ring inset */}
+                    <View style={styles.avatarRing}>
+                      {isUploading ? (
+                        <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e2e8f0' }]}>
+                          <ActivityIndicator color="#005eb8" />
+                        </View>
+                      ) : (
+                        <Avatar circular size={AVATAR_SIZE} style={styles.avatar}>
+                          {(user?.avatar || user?.profile_picture) && <Avatar.Image src={user?.avatar || user?.profile_picture} />}
+                          <Avatar.Fallback backgroundColor="#005eb8" justifyContent="center" alignItems="center">
+                            <Text color="#fff" fontSize={42} fontWeight="bold">
+                              {(user?.name || 'U').charAt(0).toUpperCase()}
+                            </Text>
+                          </Avatar.Fallback>
+                        </Avatar>
+                      )}
                     </View>
-                  ) : (
-                    <Avatar circular size={100} style={styles.avatar}>
-                      {(user?.avatar || user?.profile_picture) && <Avatar.Image src={user.avatar} />}
-                      <Avatar.Fallback backgroundColor="#005eb8" justifyContent="center" alignItems="center">
-                        <Text color="#fff" fontSize={42} fontWeight="bold">
-                          {(user?.name || 'U').charAt(0).toUpperCase()}
-                        </Text>
-                      </Avatar.Fallback>
-                    </Avatar>
-                  )}
+                  </View>
+                  {/* Camera button */}
                   <View style={styles.cameraBtn}>
-                    <Camera color="#fff" size={14} />
+                    <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                    <Camera color="#fff" size={14} style={{ zIndex: 1 }} />
                   </View>
                 </TouchableOpacity>
               </Animated.View>
@@ -278,44 +374,63 @@ export default function MyProfileScreen() {
             <Animated.View entering={FadeInUp.delay(350)} style={styles.nameArea}>
               <XStack alignItems="center" space="$2" justifyContent="center">
                 <TouchableOpacity onPress={() => setEditNameModal(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text fontSize={24} fontWeight="900" color="#0f172a" letterSpacing={-0.5}>
+                  <Text fontSize={26} fontWeight="900" color={TOKENS.COLORS.TEXT_PRIMARY} letterSpacing={-0.5} marginRight={8}>
                     {user?.name || 'My Profile'}
                   </Text>
-                  <Edit2 color="#94a3b8" size={15} style={{ marginLeft: 6 }} />
+                  <View style={{ backgroundColor: 'rgba(99,102,241,0.1)', padding: 6, borderRadius: TOKENS.RADIUS.MD }}>
+                    <Edit2 color="#6366f1" size={16} />
+                  </View>
                 </TouchableOpacity>
-                <View style={[styles.planBadge, { backgroundColor: isPro ? '#f59e0b' : '#005eb8' }]}>
-                  {isPro ? <Zap color="#fff" size={10} /> : null}
-                  <Text color="#fff" fontSize={10} fontWeight="800" marginLeft={isPro ? 2 : 0}>
-                    {isPro ? 'PRO' : 'FREE'}
-                  </Text>
+                <View style={[styles.planBadge, { overflow: 'hidden', borderColor: 'transparent', borderWidth: 0 }]}>
+                  <LinearGradient colors={isPro ? ['#f59e0b', '#fbbf24'] : ['#94a3b8', '#cbd5e1']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                  {isPro && <ShimmerSweep />}
+                  <View style={{ zIndex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                    {isPro ? <Zap color="#fff" size={10} /> : null}
+                    <Text color="#fff" fontSize={10} fontWeight="800" marginLeft={isPro ? 2 : 0}>
+                      {isPro ? 'PRO' : 'FREE'}
+                    </Text>
+                  </View>
                 </View>
               </XStack>
-              <Text fontSize={13} color="#64748b" marginTop={4}>{user?.phone || user?.phone_number || '+880 1XXX-XXXXXX'}</Text>
+              <Text fontSize={14} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={4} fontWeight="500">{user?.phone || user?.phone_number || '+880 1XXX-XXXXXX'}</Text>
 
               {/* Bio chip */}
               <TouchableOpacity onPress={() => setEditBioModal(true)} style={styles.bioChip}>
-                <Text fontSize={13} color="#475569" numberOfLines={1} flex={1}>
+                <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} numberOfLines={1} flex={1} fontWeight="500" style={{ zIndex: 1 }}>
                   {user?.status || 'Hey there! I am using UNICOM.'}
                 </Text>
-                <Edit2 color="#94a3b8" size={12} style={{ marginLeft: 4 }} />
+                <View style={{ zIndex: 1 }}><Edit2 color="#6366f1" size={14} style={{ marginLeft: 4 }} /></View>
               </TouchableOpacity>
             </Animated.View>
 
             {/* Stats Row */}
             <Animated.View entering={FadeInUp.delay(450)} style={styles.statsRow}>
+              <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0, y:0}} end={{x:0, y:1}} style={StyleSheet.absoluteFillObject} />
+              
               <View style={styles.statItem}>
-                <Text fontSize={20} fontWeight="800" color="#005eb8">{totalCalls}</Text>
-                <Text fontSize={11} color="#94a3b8" marginTop={2}>Total Calls</Text>
+                <View style={[styles.statIconBadge, { backgroundColor: '#eff6ff' }]}><PhoneIcon size={14} color="#3b82f6" /></View>
+                <CountUpNumber endValue={totalCalls} style={styles.statNumber} />
+                <Text fontSize={11} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={2} fontWeight="600">Total Calls</Text>
               </View>
+              
               <View style={styles.statDivider} />
+              
               <View style={styles.statItem}>
-                <Text fontSize={20} fontWeight="800" color="#005eb8">{totalDurationMin}m</Text>
-                <Text fontSize={11} color="#94a3b8" marginTop={2}>Call Duration</Text>
+                <View style={[styles.statIconBadge, { backgroundColor: '#f0fdf4' }]}><Clock size={14} color={TOKENS.COLORS.SUCCESS} /></View>
+                <XStack alignItems="baseline">
+                  <CountUpNumber endValue={totalDurationMin} style={styles.statNumber} />
+                  <Text style={[styles.statNumber, { fontSize: 16 }]}>m</Text>
+                </XStack>
+                <Text fontSize={11} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={2} fontWeight="600">Call Duration</Text>
               </View>
+              
               <View style={styles.statDivider} />
+              
               <View style={styles.statItem}>
-                <Text fontSize={20} fontWeight="800" color="#005eb8">{quotaUsed}</Text>
-                <Text fontSize={11} color="#94a3b8" marginTop={2}>AI Mins Used</Text>
+                <View style={[styles.statIconBadge, { backgroundColor: '#f5f3ff' }]}><Sparkles size={14} color="#8b5cf6" /></View>
+                <CountUpNumber endValue={quotaUsed} style={styles.statNumber} />
+                <Text fontSize={11} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={2} fontWeight="600">AI Mins Used</Text>
               </View>
             </Animated.View>
           </Animated.View>
@@ -324,55 +439,77 @@ export default function MyProfileScreen() {
 
             {/* ─── AI QUOTA ─── */}
             <Animated.View entering={SlideInRight.delay(80).springify()}>
-              <View style={styles.quotaCard}>
-                <XStack alignItems="center" space="$2" marginBottom={10}>
+              <View style={[styles.quotaCard, { shadowColor: '#6366f1', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 4 }]}>
+                <XStack alignItems="center" space="$2" marginBottom={12}>
                   <Sparkles color="#7c3aed" size={18} />
-                  <Text fontWeight="700" fontSize={15} color="#0f172a">AI Translation Quota</Text>
+                  <Text fontWeight="800" fontSize={15} color={TOKENS.COLORS.TEXT_PRIMARY}>AI Translation Quota</Text>
                   <View style={{ flex: 1 }} />
-                  <Text fontWeight="700" color="#005eb8" fontSize={13}>{quotaUsed} / 100 min</Text>
+                  {!isPro && <Text fontWeight="800" color="#6366f1" fontSize={13}>{quotaUsed} / 100 min</Text>}
                 </XStack>
-                <View style={styles.quotaTrack}>
-                  <View style={[styles.quotaFill, { width: `${quotaPct}%`, backgroundColor: quotaPct > 80 ? '#ef4444' : '#005eb8' }]} />
-                </View>
-                <Text fontSize={12} color="#94a3b8" marginTop={8}>
-                  {isPro ? 'Unlimited AI translation active' : `${100 - quotaUsed} free minutes remaining today`}
-                </Text>
+
+                {isPro ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                     <View style={{ width: 48, height: 48, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                       <LinearGradient colors={TOKENS.GRADIENTS.GOLD} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+                       <Infinity color="#f59e0b" size={28} style={{ zIndex: 1 }} />
+                     </View>
+                     <Text fontSize={13} fontWeight="700" color="#f59e0b" marginTop={8}>Unlimited AI Translation Active</Text>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.quotaTrack}>
+                      <ImageBackground source={{uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhYWGMYAEYB8RmROaABADeOQ8CXl/xfgAAAABJRU5ErkJggg=='}} style={[StyleSheet.absoluteFillObject, { opacity: 0.05 }]} resizeMode="repeat" />
+                      <Animated.View style={[styles.quotaFill, { width: `${quotaPct}%`, shadowColor: quotaPct > 80 ? '#ef4444' : '#6366f1', shadowOpacity: 0.4, shadowOffset: {width:0, height:2}, shadowRadius: 4 }]}>
+                        <LinearGradient colors={quotaPct > 80 ? ['#f97316', '#ef4444'] : ['#38bdf8', '#6366f1']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                      </Animated.View>
+                    </View>
+                    <Text fontSize={12} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={8} fontWeight="500">
+                      {100 - quotaUsed} free minutes remaining today
+                    </Text>
+                  </>
+                )}
               </View>
             </Animated.View>
 
             {/* ─── UPGRADE BANNER (Free only) ─── */}
             {!isPro && (
               <Animated.View entering={SlideInRight.delay(100).springify()}>
-                <TouchableOpacity style={styles.upgradeBanner} activeOpacity={0.85} onPress={() => Alert.alert("Upgrade to Pro", "In-app purchases are coming soon in the next update!")}>
-                  <XStack alignItems="center" space="$3" flex={1}>
-                    <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: 12 }}>
-                      <Zap color="#fff" size={22} />
-                    </View>
-                    <YStack flex={1}>
-                      <Text color="#fff" fontWeight="800" fontSize={16}>Upgrade to Pro</Text>
-                      <Text color="rgba(255,255,255,0.8)" fontSize={13}>Unlimited AI translation, HD calls & more</Text>
-                    </YStack>
-                    <ChevronRight color="#fff" size={20} />
-                  </XStack>
-                </TouchableOpacity>
+                <ScaleButton activeScale={0.96} onPress={() => Alert.alert("Upgrade to Pro", "In-app purchases are coming soon in the next update!")} style={styles.upgradeBannerWrapper}>
+                  <View style={[styles.upgradeBanner, { overflow: 'hidden' }]}>
+                    <LinearGradient colors={TOKENS.GRADIENTS.AI} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                    <ShimmerSweep />
+                    <XStack alignItems="center" space="$3" flex={1} style={{ zIndex: 1 }}>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: TOKENS.RADIUS.MD }}>
+                        <Zap color="#fff" size={22} />
+                      </View>
+                      <YStack flex={1}>
+                        <Text color="#fff" fontWeight="900" fontSize={16}>Upgrade to Pro</Text>
+                        <Text color="rgba(255,255,255,0.9)" fontSize={13} fontWeight="500">Unlimited AI translation & more</Text>
+                      </YStack>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 6, borderRadius: TOKENS.RADIUS.MD }}>
+                         <ChevronRight color="#fff" size={20} />
+                      </View>
+                    </XStack>
+                  </View>
+                </ScaleButton>
               </Animated.View>
             )}
 
             {/* ─── ACCOUNT ─── */}
-            <SectionCard title="Account" delay={150}>
+            <SectionCard title="ACCOUNT" delay={150}>
               <SettingRow
-                icon={<Globe />} iconBg="#eff6ff" iconColor="#005eb8"
+                icon={<Globe />} iconColors={['#38bdf8', '#0ea5e9']}
                 label="Native Language" subtitle={LANGS[nativeLanguage] || 'English'}
                 onPress={() => setLanguageModal(true)}
               />
               <SettingRow
-                icon={<ImageIcon />} iconBg="#eff6ff" iconColor="#005eb8"
+                icon={<ImageIcon />} iconColors={['#38bdf8', '#0ea5e9']}
                 label="Chat Wallpaper" subtitle={isUploadingWallpaper ? 'Uploading...' : 'Customize chat background'}
                 onPress={pickAndUploadWallpaper}
-                rightElement={isUploadingWallpaper ? <ActivityIndicator color="#005eb8" /> : undefined}
+                rightElement={isUploadingWallpaper ? <ActivityIndicator color="#0ea5e9" /> : undefined}
               />
               <SettingRow
-                icon={<CreditCard />} iconBg="#eff6ff" iconColor="#005eb8"
+                icon={<CreditCard />} iconColors={['#38bdf8', '#0ea5e9']}
                 label="Payment Methods" subtitle="Bank & crypto receiving details"
                 onPress={() => setPaymentModal(true)}
                 isLast
@@ -380,126 +517,124 @@ export default function MyProfileScreen() {
             </SectionCard>
 
             {/* ─── PRIVACY & SECURITY ─── */}
-            <SectionCard title="Privacy & Security" delay={220}>
+            <SectionCard title="PRIVACY & SECURITY" delay={220}>
               <SettingRow
-                icon={<Eye />} iconBg="#f0fdf4" iconColor="#16a34a"
+                icon={<Eye />} iconColors={['#34d399', '#10b981']}
                 label="Last Seen & Online" subtitle={`Visible to: ${(privacy.lastSeen || 'everyone').replace('_', ' ')}`}
                 onPress={() => setPrivacyModal({ visible: true, type: 'lastSeen' })}
               />
               <SettingRow
-                icon={<ImageIcon />} iconBg="#f0fdf4" iconColor="#16a34a"
+                icon={<ImageIcon />} iconColors={['#34d399', '#10b981']}
                 label="Profile Photo" subtitle={`Visible to: ${(privacy.profilePhoto || 'everyone').replace('_', ' ')}`}
                 onPress={() => setPrivacyModal({ visible: true, type: 'profilePhoto' })}
               />
               <SettingRow
-                icon={<CheckCheck />} iconBg="#f0fdf4" iconColor="#16a34a"
+                icon={<CheckCheck />} iconColors={['#34d399', '#10b981']}
                 label="Read Receipts" subtitle="Let others know you've read messages"
-                rightElement={
-                  <AnimatedToggle value={privacy.readReceipts} onValueChange={(val) => togglePrivacy('readReceipts', val)} />
-                }
+                rightElement={<AnimatedToggle value={privacy.readReceipts} onValueChange={(val) => togglePrivacy('readReceipts', val)} />}
               />
               {/* Blocked Users Expandable */}
-              <TouchableOpacity
-                  onPress={() => setShowBlockedList(!showBlockedList)}
-                  style={styles.settingRow}
-                >
+              <TouchableHighlight underlayColor="#f1f5f9" onPress={() => setShowBlockedList(!showBlockedList)}>
+                <View style={styles.settingRow}>
                   <XStack alignItems="center" space="$3" flex={1}>
-                    <View style={[styles.settingIcon, { backgroundColor: '#fff1f2' }]}>
-                      <ShieldBan color="#ef4444" size={20} />
+                    <View style={[styles.settingIcon, { overflow: 'hidden' }]}>
+                      <LinearGradient colors={TOKENS.GRADIENTS.DANGER} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                      <ShieldBan color="#fff" size={20} style={{ zIndex: 1 }} />
                     </View>
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#cbd5e1' }}>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e2e8f0' }}>
                       <YStack flex={1}>
-                        <Text fontWeight="600" fontSize={16} color="#0f172a">Blocked Users</Text>
-                        <Text fontSize={13} color="#64748b" marginTop={2}>{blockedUsers.length} blocked</Text>
+                        <Text fontWeight="600" fontSize={16} color={TOKENS.COLORS.TEXT_PRIMARY}>Blocked Users</Text>
+                        <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={2}>{blockedUsers.length} blocked</Text>
                       </YStack>
-                      {showBlockedList ? <ChevronUp color="#cbd5e1" size={20} /> : <ChevronDown color="#cbd5e1" size={20} />}
+                      <View style={styles.chevronWrapper}>
+                        {showBlockedList ? <ChevronUp color={TOKENS.COLORS.TEXT_SECONDARY} size={16} /> : <ChevronDown color={TOKENS.COLORS.TEXT_SECONDARY} size={16} />}
+                      </View>
                     </View>
                   </XStack>
-                </TouchableOpacity>
-              {showBlockedList && (
-                <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-                  {loadingBlocks ? (
-                    <ActivityIndicator color="#005eb8" style={{ padding: 12 }} />
-                  ) : blockedUsers.length === 0 ? (
-                    <Text color="#94a3b8" fontSize={14} textAlign="center" padding="$3">No blocked users</Text>
-                  ) : (
-                    blockedUsers.map(bu => (
-                      <XStack key={bu.id} alignItems="center" justifyContent="space-between" paddingVertical={10} borderBottomWidth={1} borderColor="#f1f5f9">
-                        <XStack alignItems="center" space="$3">
-                          <Avatar circular size={36}>
-                              {bu.profile_picture && <Avatar.Image src={bu.profile_picture} />}
-                              <Avatar.Fallback backgroundColor="#005eb8" justifyContent="center" alignItems="center">
-                                <Text color="#fff" fontSize={16} fontWeight="bold">
-                                  {(bu.name || 'U').charAt(0).toUpperCase()}
-                                </Text>
-                              </Avatar.Fallback>
-                            </Avatar>
-                          <Text fontWeight="600" color="#0f172a">{bu.name}</Text>
-                        </XStack>
-                        <TouchableOpacity onPress={() => handleUnblock(bu.id, bu.name)} style={styles.unblockBtn}>
-                          <Unlock color="#005eb8" size={13} />
-                          <Text color="#005eb8" fontWeight="700" fontSize={12} marginLeft={4}>Unblock</Text>
-                        </TouchableOpacity>
-                      </XStack>
-                    ))
-                  )}
                 </View>
+              </TouchableHighlight>
+              {showBlockedList && (
+                <Animated.View entering={FadeInDown.duration(200)} style={{ backgroundColor: 'rgba(255, 228, 230, 0.4)' }}>
+                  <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                    {loadingBlocks ? (
+                      <ActivityIndicator color={TOKENS.COLORS.DANGER} style={{ padding: 12 }} />
+                    ) : blockedUsers.length === 0 ? (
+                      <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize={14} textAlign="center" padding="$3">No blocked users</Text>
+                    ) : (
+                      blockedUsers.map(bu => (
+                        <XStack key={bu.id} alignItems="center" justifyContent="space-between" paddingVertical={10} borderBottomWidth={1} borderColor="#ffe4e6">
+                          <XStack alignItems="center" space="$3">
+                            <Avatar circular size={36}>
+                                {bu.profile_picture && <Avatar.Image src={bu.profile_picture} />}
+                                <Avatar.Fallback backgroundColor="#005eb8" justifyContent="center" alignItems="center">
+                                  <Text color="#fff" fontSize={16} fontWeight="bold">{(bu.name || 'U').charAt(0).toUpperCase()}</Text>
+                                </Avatar.Fallback>
+                              </Avatar>
+                            <Text fontWeight="600" color={TOKENS.COLORS.TEXT_PRIMARY}>{bu.name}</Text>
+                          </XStack>
+                          <ScaleButton onPress={() => handleUnblock(bu.id, bu.name)} style={styles.unblockBtn}>
+                            <Unlock color={TOKENS.COLORS.DANGER} size={13} />
+                            <Text color={TOKENS.COLORS.DANGER} fontWeight="700" fontSize={12} marginLeft={4}>Unblock</Text>
+                          </ScaleButton>
+                        </XStack>
+                      ))
+                    )}
+                  </View>
+                </Animated.View>
               )}
               <SettingRow
-                icon={<Lock />} iconBg="#f0fdf4" iconColor="#16a34a"
-                label="Two-Factor Auth" subtitle="Coming soon"
+                icon={<Lock />} iconColors={['#34d399', '#10b981']}
+                label="Two-Factor Auth" subtitle="Protect your account"
                 onPress={() => Alert.alert('Coming soon', 'This feature is coming soon!')}
+                rightElement={<View style={styles.comingSoonBadge}><LinearGradient colors={TOKENS.GRADIENTS.AI} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} /><Text color="#fff" fontSize={10} fontWeight="800" style={{ zIndex: 1 }}>SOON</Text></View>}
                 isLast
               />
             </SectionCard>
 
             {/* ─── APP SETTINGS ─── */}
-            <SectionCard title="App Settings" delay={290}>
+            <SectionCard title="APP SETTINGS" delay={290}>
               <SettingRow
-                icon={<Bell />} iconBg="#f5f3ff" iconColor="#7c3aed"
+                icon={<Bell />} iconColors={['#a78bfa', '#8b5cf6']}
                 label="Notifications" subtitle="Push & in-app alerts"
-                rightElement={
-                  <AnimatedToggle value={notifications} onValueChange={async (val) => {
-                    Platform.OS !== 'web' && Haptics.impactAsync();
-                    setNotifications(val);
-                    await updateUserProfile({ notifications: val });
-                  }} />
-                }
-              isLast
+                rightElement={<AnimatedToggle value={notifications} onValueChange={async (val) => {
+                  Platform.OS !== 'web' && Haptics.impactAsync();
+                  setNotifications(val);
+                  await updateUserProfile({ notifications: val });
+                }} />}
               />
               <SettingRow
-                icon={<Moon />} iconBg="#f5f3ff" iconColor="#7c3aed"
-                label="Dark Mode" subtitle="Coming soon"
-                onPress={() => Alert.alert('Coming soon', 'This feature is coming soon!')}
-                rightElement={
-                  <View style={styles.comingSoonBadge}>
-                    <Text color="#7c3aed" fontSize={10} fontWeight="700">SOON</Text>
-                  </View>
-                }
+                icon={<Moon />} iconColors={['#a78bfa', '#8b5cf6']}
+                label="Dark Mode" subtitle="Change app appearance"
+                rightElement={<AnimatedToggle value={theme === 'dark'} onValueChange={async (val) => {
+                  Platform.OS !== 'web' && Haptics.impactAsync();
+                  setTheme(val ? 'dark' : 'light');
+                }} />}
                 isLast
               />
             </SectionCard>
 
             {/* ─── HELP & SUPPORT ─── */}
-            <SectionCard title="Help & Support" delay={360}>
+            <SectionCard title="HELP & SUPPORT" delay={360}>
               <SettingRow
-                icon={<HelpCircle />} iconBg="#fef9c3" iconColor="#ca8a04"
+                icon={<HelpCircle />} iconColors={['#fbbf24', '#f59e0b']}
                 label="Contact Support" subtitle="Report translation issues"
                 onPress={() => Alert.alert('Support', 'Contact support@unicom.com')}
               />
               <SettingRow
-                icon={<Shield />} iconBg="#fef9c3" iconColor="#ca8a04"
+                icon={<Shield />} iconColors={['#fbbf24', '#f59e0b']}
                 label="Privacy Policy" subtitle="Read our privacy terms"
+                onPress={() => {}}
                 isLast
               />
             </SectionCard>
 
             {/* ─── LOGOUT ─── */}
             <Animated.View entering={FadeInUp.delay(430)}>
-              <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-                <LogOut color="#ef4444" size={20} />
-                <Text color="#ef4444" fontWeight="700" fontSize={16} marginLeft="$2">Log Out</Text>
-              </TouchableOpacity>
+              <ScaleButton onPress={logout} haptic={Haptics.ImpactFeedbackStyle.Heavy} style={[styles.logoutBtn, { width: '100%' }]}>
+                <LinearGradient colors={TOKENS.GRADIENTS.DANGER} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                <LogOut color="#ffffff" size={20} style={{ zIndex: 1 }} />
+                <Text color="#ffffff" fontWeight="800" fontSize={16} marginLeft="$2" style={{ zIndex: 1 }}>Log Out</Text>
+              </ScaleButton>
             </Animated.View>
 
             <Text textAlign="center" color="#cbd5e1" fontSize={12} marginTop="$4">UNICOM v{Constants.expoConfig?.version || "1.0.0"} • Built with ♥</Text>
@@ -512,39 +647,57 @@ export default function MyProfileScreen() {
         {/* Edit Name Modal */}
         <Modal visible={editNameModal} transparent animationType="fade" onRequestClose={() => setEditNameModal(false)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
+            <Animated.View entering={ZoomIn.duration(200)} style={styles.modalCard}>
               <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-                <Text fontSize={20} fontWeight="800" color="#0f172a">Edit Name</Text>
-                <TouchableOpacity onPress={() => setEditNameModal(false)}><X color="#94a3b8" size={24} /></TouchableOpacity>
+                <XStack alignItems="center" space="$2">
+                  <View style={{ width: 32, height: 32, borderRadius: TOKENS.RADIUS.MD, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                     <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                     <Edit2 color="#3b82f6" size={16} style={{ zIndex: 1 }} />
+                  </View>
+                  <Text fontSize={20} fontWeight="800" color={TOKENS.COLORS.TEXT_PRIMARY}>Edit Name</Text>
+                </XStack>
+                <TouchableOpacity onPress={() => setEditNameModal(false)}><X color={TOKENS.COLORS.TEXT_SECONDARY} size={24} /></TouchableOpacity>
               </XStack>
-              <TextInput
-                style={styles.modalInput} value={newName} onChangeText={setNewName}
-                placeholder="Your name" placeholderTextColor="#94a3b8" autoFocus
-              />
-              <TouchableOpacity onPress={handleSaveName} style={styles.modalSaveBtn} disabled={savingName}>
-                {savingName ? <ActivityIndicator color="#fff" /> : <Text color="#fff" fontWeight="700" fontSize={16}>Save</Text>}
-              </TouchableOpacity>
-            </View>
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalInput} value={newName} onChangeText={setNewName}
+                  placeholder="Your name" placeholderTextColor="#94a3b8" autoFocus
+                />
+              </View>
+              <ScaleButton onPress={handleSaveName} style={styles.modalSaveBtn} disabled={savingName}>
+                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                {savingName ? <ActivityIndicator color="#fff" /> : <Text color="#fff" fontWeight="700" fontSize={16} style={{ zIndex: 1 }}>Save</Text>}
+              </ScaleButton>
+            </Animated.View>
           </KeyboardAvoidingView>
         </Modal>
 
         {/* Edit Bio Modal */}
         <Modal visible={editBioModal} transparent animationType="fade" onRequestClose={() => setEditBioModal(false)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
+            <Animated.View entering={ZoomIn.duration(200)} style={styles.modalCard}>
               <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-                <Text fontSize={20} fontWeight="800" color="#0f172a">Edit Bio</Text>
-                <TouchableOpacity onPress={() => setEditBioModal(false)}><X color="#94a3b8" size={24} /></TouchableOpacity>
+                <XStack alignItems="center" space="$2">
+                  <View style={{ width: 32, height: 32, borderRadius: TOKENS.RADIUS.MD, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                     <LinearGradient colors={['#f3e8ff', '#e9d5ff']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                     <Edit2 color="#a855f7" size={16} style={{ zIndex: 1 }} />
+                  </View>
+                  <Text fontSize={20} fontWeight="800" color={TOKENS.COLORS.TEXT_PRIMARY}>Edit Bio</Text>
+                </XStack>
+                <TouchableOpacity onPress={() => setEditBioModal(false)}><X color={TOKENS.COLORS.TEXT_SECONDARY} size={24} /></TouchableOpacity>
               </XStack>
-              <TextInput
-                style={[styles.modalInput, { height: 100, textAlignVertical: 'top' }]} value={newBio}
-                onChangeText={setNewBio} placeholder="Your bio" placeholderTextColor="#94a3b8"
-                autoFocus multiline
-              />
-              <TouchableOpacity onPress={handleSaveBio} style={styles.modalSaveBtn} disabled={savingBio}>
-                {savingBio ? <ActivityIndicator color="#fff" /> : <Text color="#fff" fontWeight="700" fontSize={16}>Save</Text>}
-              </TouchableOpacity>
-            </View>
+              <View style={[styles.modalInputWrapper, { height: 100 }]}>
+                <TextInput
+                  style={[styles.modalInput, { height: '100%', textAlignVertical: 'top' }]} value={newBio}
+                  onChangeText={setNewBio} placeholder="Your bio" placeholderTextColor="#94a3b8"
+                  autoFocus multiline
+                />
+              </View>
+              <ScaleButton onPress={handleSaveBio} style={styles.modalSaveBtn} disabled={savingBio}>
+                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                {savingBio ? <ActivityIndicator color="#fff" /> : <Text color="#fff" fontWeight="700" fontSize={16} style={{ zIndex: 1 }}>Save</Text>}
+              </ScaleButton>
+            </Animated.View>
           </KeyboardAvoidingView>
         </Modal>
 
@@ -555,25 +708,33 @@ export default function MyProfileScreen() {
             <Animated.View entering={FadeInUp.springify()} style={styles.bottomSheet}>
               <View style={styles.sheetHandle} />
               <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-                <Text fontSize={20} fontWeight="800" color="#0f172a">My QR Code</Text>
-                <TouchableOpacity onPress={() => setQrModal(false)}><X color="#94a3b8" size={24} /></TouchableOpacity>
+                <Text fontSize={20} fontWeight="900" color={TOKENS.COLORS.TEXT_PRIMARY}>My QR Code</Text>
+                <TouchableOpacity onPress={() => setQrModal(false)}><X color={TOKENS.COLORS.TEXT_SECONDARY} size={24} /></TouchableOpacity>
               </XStack>
-              <YStack alignItems="center" padding="$4">
-                <View style={[styles.qrPlaceholder, { padding: 0, backgroundColor: 'transparent', overflow: 'hidden' }]}>
-                  {user?.id && (
-                    <QRCode
-                      value={`unicom://profile/${user?.phone || user?.id}`}
-                      size={160}
-                      color="#005eb8"
-                      backgroundColor="transparent"
-                    />
-                  )}
+              <YStack alignItems="center" padding="$4" paddingBottom="$8">
+                <View style={styles.qrContainer}>
+                  <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+                  <View style={styles.qrFrame}>
+                    {user?.id && (
+                      <QRCode
+                        value={`unicom://profile/${user?.phone || user?.id}`}
+                        size={180}
+                        color={TOKENS.COLORS.TEXT_PRIMARY}
+                        backgroundColor="transparent"
+                      />
+                    )}
+                  </View>
+                  <View style={styles.qrWatermark}>
+                    <Zap color="#3b82f6" size={16} />
+                    <Text fontSize={12} fontWeight="800" color="#3b82f6" marginLeft={4}>UNICOM</Text>
+                  </View>
                 </View>
-                <Text fontSize={18} fontWeight="700" color="#0f172a" marginTop="$4">{user?.name}</Text>
-                <Text fontSize={14} color="#64748b" marginTop={4}>{user?.phone_number}</Text>
-                <Text fontSize={12} color="#94a3b8" marginTop="$3" textAlign="center">
-                  Others can scan this code to add you as a contact instantly
-                </Text>
+                <Text fontSize={20} fontWeight="800" color={TOKENS.COLORS.TEXT_PRIMARY} marginTop="$5">{user?.name}</Text>
+                <Text fontSize={14} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={4} fontWeight="500">{user?.phone_number}</Text>
+                
+                <ScaleButton onPress={() => { /* Placeholder for sharing */ }} style={[styles.modalSaveBtn, { marginTop: 24, backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe' }]}>
+                   <Text color="#005eb8" fontWeight="800" fontSize={16}>Share QR Code</Text>
+                </ScaleButton>
               </YStack>
             </Animated.View>
           </View>
@@ -586,18 +747,25 @@ export default function MyProfileScreen() {
             <View style={styles.bottomSheet}>
               <View style={styles.sheetHandle} />
               <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-                <Text fontSize={20} fontWeight="800" color="#0f172a">
+                <Text fontSize={20} fontWeight="900" color={TOKENS.COLORS.TEXT_PRIMARY}>
                   Who can see my {privacyModal.type === 'lastSeen' ? 'Last Seen' : 'Profile Photo'}?
                 </Text>
-                <TouchableOpacity onPress={() => setPrivacyModal({ visible: false, type: '' })}><X color="#94a3b8" size={24} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => setPrivacyModal({ visible: false, type: '' })}><X color={TOKENS.COLORS.TEXT_SECONDARY} size={24} /></TouchableOpacity>
               </XStack>
               {['everyone', 'my_contacts', 'nobody'].map(opt => (
                 <TouchableOpacity
-                  key={opt} style={styles.privacyOption}
+                  key={opt} style={[styles.privacyOption, privacy[privacyModal.type as keyof typeof privacy] === opt && { backgroundColor: '#f8fafc', borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 12 }]}
                   onPress={() => { togglePrivacy(privacyModal.type, opt); setPrivacyModal({ visible: false, type: '' }); }}
                 >
-                  <Text fontSize={16} color="#0f172a" textTransform="capitalize">{opt.replace('_', ' ')}</Text>
-                  {privacy[privacyModal.type as keyof typeof privacy] === opt && <Check color="#005eb8" size={20} />}
+                  <XStack alignItems="center" space="$3">
+                    {opt === 'everyone' && <Globe color={TOKENS.COLORS.TEXT_SECONDARY} size={18} />}
+                    {opt === 'my_contacts' && <Users color={TOKENS.COLORS.TEXT_SECONDARY} size={18} />}
+                    {opt === 'nobody' && <Lock color={TOKENS.COLORS.TEXT_SECONDARY} size={18} />}
+                    <Text fontSize={16} fontWeight={privacy[privacyModal.type as keyof typeof privacy] === opt ? "700" : "500"} color={TOKENS.COLORS.TEXT_PRIMARY} textTransform="capitalize">{opt.replace('_', ' ')}</Text>
+                  </XStack>
+                  {privacy[privacyModal.type as keyof typeof privacy] === opt && (
+                    <Animated.View entering={ZoomIn.springify()}><Check color="#3b82f6" size={20} /></Animated.View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -611,20 +779,22 @@ export default function MyProfileScreen() {
             <View style={styles.bottomSheet}>
               <View style={styles.sheetHandle} />
               <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-                <Text fontSize={20} fontWeight="800" color="#0f172a">Native Language</Text>
-                <TouchableOpacity onPress={() => setLanguageModal(false)}><X color="#94a3b8" size={24} /></TouchableOpacity>
+                <Text fontSize={20} fontWeight="900" color={TOKENS.COLORS.TEXT_PRIMARY}>Native Language</Text>
+                <TouchableOpacity onPress={() => setLanguageModal(false)}><X color={TOKENS.COLORS.TEXT_SECONDARY} size={24} /></TouchableOpacity>
               </XStack>
               {Object.entries(LANGS).map(([code, name]) => (
                 <TouchableOpacity
-                  key={code} style={styles.privacyOption}
+                  key={code} style={[styles.privacyOption, nativeLanguage === code && { backgroundColor: '#f8fafc', borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 12 }]}
                   onPress={async () => {
                     setNativeLanguage(code);
                     await updateUserProfile({ language: code });
-                    setLanguageModal(false);
+                    setTimeout(() => setLanguageModal(false), 300);
                   }}
                 >
-                  <Text fontSize={16} color="#0f172a">{name}</Text>
-                  {nativeLanguage === code && <Check color="#005eb8" size={20} />}
+                  <Text fontSize={16} fontWeight={nativeLanguage === code ? "700" : "500"} color={TOKENS.COLORS.TEXT_PRIMARY}>{code.toUpperCase()} • {name}</Text>
+                  {nativeLanguage === code && (
+                    <Animated.View entering={ZoomIn.springify()}><Check color="#3b82f6" size={20} /></Animated.View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -638,13 +808,20 @@ export default function MyProfileScreen() {
             <View style={[styles.bottomSheet, { minHeight: 480 }]}>
               <View style={styles.sheetHandle} />
               <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-                <Text fontSize={20} fontWeight="800" color="#0f172a">Payment Details</Text>
-                <TouchableOpacity onPress={() => setPaymentModal(false)}><X color="#94a3b8" size={24} /></TouchableOpacity>
+                <Text fontSize={20} fontWeight="900" color={TOKENS.COLORS.TEXT_PRIMARY}>Payment Details</Text>
+                <TouchableOpacity onPress={() => setPaymentModal(false)}><X color={TOKENS.COLORS.TEXT_SECONDARY} size={24} /></TouchableOpacity>
               </XStack>
+              
+              <XStack alignItems="center" space="$2" marginBottom="$4" padding="$3" backgroundColor="#eff6ff" borderRadius={12}>
+                <Lock color="#3b82f6" size={16} />
+                <Text fontSize={12} color="#3b82f6" fontWeight="600" flex={1}>Your payment details are encrypted and only visible to you.</Text>
+              </XStack>
+              
               <XStack backgroundColor="#f1f5f9" borderRadius={12} padding={4} marginBottom="$4">
                 {(['bank', 'crypto'] as const).map(tab => (
                   <TouchableOpacity key={tab} style={[styles.tabBtn, paymentTab === tab && styles.tabBtnActive]} onPress={() => setPaymentTab(tab)}>
-                    <Text fontWeight="700" color={paymentTab === tab ? '#005eb8' : '#94a3b8'}>{tab === 'bank' ? 'Bank Transfer' : 'Crypto'}</Text>
+                    {paymentTab === tab && <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0, y:0}} end={{x:0, y:1}} style={[StyleSheet.absoluteFillObject, { borderRadius: TOKENS.RADIUS.SM }]} />}
+                    <Text fontWeight="800" color={paymentTab === tab ? '#005eb8' : '#64748b'} style={{ zIndex: 1 }}>{tab === 'bank' ? 'Bank Transfer' : 'Crypto'}</Text>
                   </TouchableOpacity>
                 ))}
               </XStack>
@@ -657,10 +834,10 @@ export default function MyProfileScreen() {
                       { label: 'Routing Number', key: 'routingNumber', placeholder: 'e.g. 123456789', numeric: true },
                       { label: 'Account Number', key: 'accountNumber', placeholder: 'e.g. 987654321', numeric: true },
                     ].map(f => (
-                      <View key={f.key}>
-                        <Text color="#64748b" fontSize={12} marginBottom={4} marginLeft={2}>{f.label}</Text>
+                      <View key={f.key} style={styles.modalInputWrapper}>
+                        <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize={12} marginBottom={4} marginLeft={2} fontWeight="600">{f.label}</Text>
                         <TextInput
-                          style={styles.textInput} placeholder={f.placeholder} placeholderTextColor="#94a3b8"
+                          style={[styles.modalInput, { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1 }]} placeholder={f.placeholder} placeholderTextColor="#94a3b8"
                           value={(bankDetails as any)[f.key]} onChangeText={t => setBankDetails({ ...bankDetails, [f.key]: t })}
                           keyboardType={f.numeric ? 'numeric' : 'default'}
                         />
@@ -669,17 +846,17 @@ export default function MyProfileScreen() {
                   </YStack>
                 ) : (
                   <YStack space="$3">
-                    <View>
-                      <Text color="#64748b" fontSize={12} marginBottom={4} marginLeft={2}>Network</Text>
-                      <TextInput style={styles.textInput} placeholder="e.g. TRC20, ERC20" placeholderTextColor="#94a3b8" value={cryptoDetails.network} onChangeText={t => setCryptoDetails({ ...cryptoDetails, network: t })} />
+                    <View style={styles.modalInputWrapper}>
+                      <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize={12} marginBottom={4} marginLeft={2} fontWeight="600">Network</Text>
+                      <TextInput style={[styles.modalInput, { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1 }]} placeholder="e.g. TRC20, ERC20" placeholderTextColor="#94a3b8" value={cryptoDetails.network} onChangeText={t => setCryptoDetails({ ...cryptoDetails, network: t })} />
                     </View>
-                    <View>
-                      <Text color="#64748b" fontSize={12} marginBottom={4} marginLeft={2}>Wallet Address</Text>
-                      <TextInput style={styles.textInput} placeholder="e.g. TNu3...8dKj9L" placeholderTextColor="#94a3b8" value={cryptoDetails.walletAddress} onChangeText={t => setCryptoDetails({ ...cryptoDetails, walletAddress: t })} />
+                    <View style={styles.modalInputWrapper}>
+                      <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize={12} marginBottom={4} marginLeft={2} fontWeight="600">Wallet Address</Text>
+                      <TextInput style={[styles.modalInput, { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1 }]} placeholder="e.g. TNu3...8dKj9L" placeholderTextColor="#94a3b8" value={cryptoDetails.walletAddress} onChangeText={t => setCryptoDetails({ ...cryptoDetails, walletAddress: t })} />
                     </View>
                   </YStack>
                 )}
-                <TouchableOpacity
+                <ScaleButton
                   style={[styles.modalSaveBtn, { marginTop: 24 }]}
                   disabled={savingPayment}
                   onPress={async () => {
@@ -692,69 +869,80 @@ export default function MyProfileScreen() {
                     finally { setSavingPayment(false); }
                   }}
                 >
-                  {savingPayment ? <ActivityIndicator color="#fff" /> : <Text color="#fff" fontWeight="700" fontSize={16}>Save Details</Text>}
-                </TouchableOpacity>
+                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                  {savingPayment ? <ActivityIndicator color="#fff" /> : <Text color="#fff" fontWeight="800" fontSize={16} style={{ zIndex: 1 }}>Save Details</Text>}
+                </ScaleButton>
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
         </Modal>
 
       </SafeAreaView>
-      </GradientBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   // Cover
-  cover: { height: COVER_HEIGHT, backgroundColor: '#005eb8', justifyContent: 'space-between' },
-  coverTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12 },
-  coverIconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  cover: { height: COVER_HEIGHT, backgroundColor: '#005eb8' },
+  coverTopRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 8 : 16 },
+  coverIconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   // Avatar
-  avatarArea: { alignItems: 'center', marginTop: -(AVATAR_SIZE / 2 + 4) },
-  avatarRing: { width: AVATAR_SIZE + 8, height: AVATAR_SIZE + 8, borderRadius: (AVATAR_SIZE + 8) / 2, backgroundColor: '#fff', padding: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 10 },
+  avatarArea: { alignItems: 'center', marginTop: -(AVATAR_SIZE / 2 + 6) },
+  avatarOuterRing: { width: AVATAR_SIZE + 12, height: AVATAR_SIZE + 12, borderRadius: (AVATAR_SIZE + 12) / 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', shadowColor: '#818cf8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  avatarRing: { width: AVATAR_SIZE + 6, height: AVATAR_SIZE + 6, borderRadius: (AVATAR_SIZE + 6) / 2, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, backgroundColor: '#e2e8f0' },
-  cameraBtn: { position: 'absolute', bottom: 2, right: 2, width: 30, height: 30, borderRadius: 15, backgroundColor: '#005eb8', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  cameraBtn: { position: 'absolute', bottom: 0, right: 0, width: 34, height: 34, borderRadius: 17, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff', ...TOKENS.SHADOWS.ELEVATED },
   // Name area
   nameArea: { alignItems: 'center', paddingHorizontal: 24, marginTop: 14, marginBottom: 4 },
-  planBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  bioChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, marginTop: 10, maxWidth: SCREEN_WIDTH - 64 },
+  planBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: TOKENS.RADIUS.SM },
+  bioChip: { flexDirection: 'row', alignItems: 'center', borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 16, paddingVertical: 10, marginTop: 10, maxWidth: SCREEN_WIDTH - 64, shadowColor: '#6366f1', shadowOpacity: 0.05, shadowOffset: {width:0,height:2}, shadowRadius: 4, overflow: 'hidden' },
   // Stats
-  statsRow: { flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16, borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  statsRow: { flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16, borderRadius: TOKENS.RADIUS.LG, padding: 20, ...TOKENS.SHADOWS.SUBTLE, overflow: 'hidden' },
   statItem: { flex: 1, alignItems: 'center' },
   statDivider: { width: 1, backgroundColor: '#f1f5f9' },
+  statIconBadge: { width: 28, height: 28, borderRadius: TOKENS.RADIUS.MD, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  statNumber: { fontSize: 22, fontWeight: '900', color: '#0f172a' },
   // Quota
-  quotaCard: { backgroundColor: '#fff', borderRadius: 20, padding: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  quotaTrack: { height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, overflow: 'hidden' },
-  quotaFill: { height: '100%', borderRadius: 4 },
+  quotaCard: { backgroundColor: '#fff', borderRadius: TOKENS.RADIUS.LG, padding: 20 },
+  quotaTrack: { height: 12, backgroundColor: '#f1f5f9', borderRadius: 6, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: {width:0, height:2} },
+  quotaFill: { height: '100%', borderRadius: 6 },
   // Upgrade
-  upgradeBanner: { borderRadius: 20, padding: 18, backgroundColor: '#005eb8', shadowColor: '#005eb8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8 },
+  upgradeBannerWrapper: { marginTop: 12, width: '100%' },
+  upgradeBanner: { borderRadius: TOKENS.RADIUS.LG, padding: 20, shadowColor: '#7c3aed', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },
   // Section
   sectionCard: { marginBottom: 4 },
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginLeft: 4 },
-  sectionBody: { backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  sectionTitleWrapper: { marginBottom: 10, marginLeft: 8 },
+  sectionTitle: { fontSize: 13, fontWeight: '800', color: '#64748b', letterSpacing: 0.8 },
+  cardGlassTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.8)', zIndex: 10 },
+  sectionBody: { backgroundColor: '#fff', borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', ...TOKENS.SHADOWS.SUBTLE },
   // Setting Row
   settingRow: { flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingRight: 16, backgroundColor: '#fff' },
   settingRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  settingIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  settingIcon: { width: 40, height: 40, borderRadius: TOKENS.RADIUS.LG, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.1, shadowRadius: 6 },
+  chevronWrapper: { width: 28, height: 28, borderRadius: TOKENS.RADIUS.MD, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center' },
   // Misc
-  unblockBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  comingSoonBadge: { backgroundColor: '#f5f3ff', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff1f2', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#fecdd3' },
+  unblockBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: '#fecdd3' },
+  comingSoonBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: TOKENS.RADIUS.SM, overflow: 'hidden' },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: TOKENS.RADIUS.LG, shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, overflow: 'hidden', width: '100%' },
   // Toggle
-  toggleTrack: { width: 50, height: 30, borderRadius: 15, padding: 2, justifyContent: 'center' },
-  toggleThumb: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
+  toggleTrack: { width: 52, height: 32, borderRadius: TOKENS.RADIUS.MD, padding: 2, justifyContent: 'center' },
+  toggleThumb: { width: 28, height: 28, borderRadius: TOKENS.RADIUS.MD, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
   // Modals
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalCard: { backgroundColor: '#fff', width: '88%', borderRadius: 24, padding: 24 },
-  modalInput: { backgroundColor: '#f8fafc', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', fontSize: 16, color: '#0f172a', marginBottom: 16 } as any,
-  modalSaveBtn: { backgroundColor: '#005eb8', padding: 16, borderRadius: 14, alignItems: 'center' },
-  bottomSheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  bottomSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
-  sheetHandle: { width: 40, height: 4, backgroundColor: '#e2e8f0', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  privacyOption: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  qrPlaceholder: { width: 180, height: 180, backgroundColor: '#f0f6ff', borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#e0eeff', borderStyle: 'dashed' },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
-  tabBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-  textInput: { backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', color: '#0f172a' } as any,
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalCard: { backgroundColor: '#fff', width: '88%', borderRadius: TOKENS.RADIUS.XL, padding: 24, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 24, shadowOffset: {width:0, height:12} },
+  modalInputWrapper: { marginBottom: 16 },
+  modalInput: { backgroundColor: '#f8fafc', padding: 16, borderRadius: TOKENS.RADIUS.MD, fontSize: 16, color: '#0f172a', shadowColor: '#3b82f6', shadowOpacity: 0, shadowRadius: 0, width: '100%' } as any,
+  modalSaveBtn: { overflow: 'hidden', padding: 18, borderRadius: TOKENS.RADIUS.MD, alignItems: 'center', shadowColor: '#3b82f6', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: {width:0,height:4}, width: '100%' },
+  bottomSheetOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'flex-end' },
+  bottomSheet: { backgroundColor: '#fff', borderTopLeftRadius: TOKENS.RADIUS.XL, borderTopRightRadius: TOKENS.RADIUS.XL, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 32, shadowOffset: {width:0, height:-10} },
+  sheetHandle: { width: 48, height: 5, backgroundColor: '#cbd5e1', borderRadius: 3, alignSelf: 'center', marginBottom: 24 },
+  privacyOption: { paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  qrContainer: { width: 220, height: 220, borderRadius: TOKENS.RADIUS.XL, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: {width:0, height:8} },
+  qrFrame: { padding: 16, backgroundColor: '#fff', borderRadius: TOKENS.RADIUS.LG },
+  qrWatermark: { position: 'absolute', bottom: 12, flexDirection: 'row', alignItems: 'center' },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: TOKENS.RADIUS.SM, overflow: 'hidden' },
+  tabBtnActive: {},
+  textInput: { backgroundColor: '#f8fafc', padding: 14, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: '#e2e8f0', color: '#0f172a' } as any,
 });
 

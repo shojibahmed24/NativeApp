@@ -1,5 +1,5 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
-import { View, Alert, TextInput, ActivityIndicator, TouchableOpacity, Text as RNText, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Alert, TextInput, ActivityIndicator, TouchableOpacity, Text as RNText, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,6 +8,8 @@ import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withS
 import { ChevronLeft, MessageCircle, ArrowRight, Edit3 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TOKENS } from '../../src/theme/tokens';
+
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -20,7 +22,7 @@ export default function OtpScreen() {
   
   const router = useRouter();
   const { phone } = useLocalSearchParams();
-  const { verifyOtp } = useAuth();
+  const { verifyOtp, loginWithPhone } = useAuth();
   const insets = useSafeAreaInsets();
   
   const inputRefs = useRef<TextInput[]>([]);
@@ -127,9 +129,10 @@ export default function OtpScreen() {
     router.replace('/(auth)/login');
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (timer === 0) {
       setTimer(45);
+      await loginWithPhone(phone as string, 'sms');
       Alert.alert('Code Sent', 'A new verification code has been sent.');
     }
   };
@@ -159,8 +162,8 @@ export default function OtpScreen() {
     <View style={styles.container}>
       {/* Background Gradient */}
       <LinearGradient
-        colors={['#091733', '#0f2f5c', '#005eb8', '#e8f1ff']}
-        locations={[0, 0.3, 0.7, 1]}
+        colors={TOKENS.GRADIENTS.PRIMARY_DARK}
+        locations={[0, 0.5, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
@@ -173,7 +176,7 @@ export default function OtpScreen() {
       {/* Header / Back Navigation */}
       <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <BlurView intensity={40} tint="light" style={[StyleSheet.absoluteFillObject, { borderRadius: 22, overflow: 'hidden' }]} />
+          <BlurView intensity={40} tint="light" style={[StyleSheet.absoluteFillObject, { borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden' }]} />
           <ChevronLeft color="#ffffff" size={24} />
         </TouchableOpacity>
         
@@ -328,7 +331,7 @@ const styles = StyleSheet.create({
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: TOKENS.RADIUS.LG,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -339,7 +342,7 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: 64,
     height: 64,
-    borderRadius: 32,
+    borderRadius: TOKENS.RADIUS.XL,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -368,7 +371,7 @@ const styles = StyleSheet.create({
   iconWrapper: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: TOKENS.RADIUS.LG,
     backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
@@ -378,7 +381,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: TOKENS.RADIUS.LG,
     backgroundColor: '#005eb8',
   },
   title: {
@@ -398,14 +401,10 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 28,
+    borderRadius: TOKENS.RADIUS.XL,
     padding: 24,
     paddingTop: 36,
-    shadowColor: '#005eb8',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.15,
-    shadowRadius: 40,
-    elevation: 12,
+    ...TOKENS.SHADOWS.ELEVATED,
   },
   cardAccent: {
     position: 'absolute',
@@ -423,9 +422,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   otpBoxWrapper: {
-    width: 48,
+    width: Math.min(48, (Dimensions.get('window').width - 120) / 6),
     height: 56,
-    borderRadius: 14,
+    borderRadius: TOKENS.RADIUS.MD,
     backgroundColor: '#f8fafc',
   },
   otpBoxWrapperActive: {
@@ -440,7 +439,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1.5,
     borderColor: '#cbd5e1',
-    borderRadius: 14,
+    borderRadius: TOKENS.RADIUS.MD,
     textAlign: 'center',
     fontSize: 24,
     fontWeight: '700',
@@ -481,7 +480,7 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 56,
-    borderRadius: 16,
+    borderRadius: TOKENS.RADIUS.MD,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

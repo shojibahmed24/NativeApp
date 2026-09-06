@@ -3,6 +3,8 @@ import { Tabs } from 'expo-router';
 import { Phone, MessageSquare, Users, ShieldBan, Grip, User, CheckSquare } from 'lucide-react-native';
 import { YStack, View, Text } from 'tamagui';
 import { Platform, TouchableOpacity } from 'react-native';
+import { TOKENS } from '../../src/theme/tokens';
+
 
 const CustomTabBarButton = ({ children, onPress, style }: any) => (
   <TouchableOpacity
@@ -24,11 +26,7 @@ const CustomTabBarButton = ({ children, onPress, style }: any) => (
       justifyContent="center"
       alignItems="center"
       style={{
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 5,
+        ...TOKENS.SHADOWS.ELEVATED,
       }}
     >
       {children}
@@ -134,6 +132,7 @@ export default function MainLayout() {
         name="blocking"
         options={{
           href: null,
+          tabBarStyle: { display: 'none' },
         }}
       />
       {/* Hide the Profile folder and any other tabs completely */}
@@ -141,12 +140,14 @@ export default function MainLayout() {
         name="profile/[id]"
         options={{
           href: null,
+          tabBarStyle: { display: 'none' },
         }}
       />
       <Tabs.Screen
         name="call-info/[id]"
         options={{
           href: null,
+          tabBarStyle: { display: 'none' },
         }}
       />
     </Tabs>

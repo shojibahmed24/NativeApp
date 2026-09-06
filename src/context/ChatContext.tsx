@@ -79,8 +79,6 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     
     return () => {
       socket.off('message:received', handleNewMessage);
-
-            clearInterval(cronInterval);
     };
   }, [user]);
   

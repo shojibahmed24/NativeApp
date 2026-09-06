@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ScrollView, TextInput, TouchableOpacity, View, Image, ActivityIndicator,
-  StyleSheet, RefreshControl, Platform, Alert
+  ScrollView, TextInput, TouchableOpacity, TouchableHighlight, View, Image,
+  StyleSheet, RefreshControl, Platform, Alert, Animated as RNAnimated
 } from 'react-native';
 import { YStack, XStack, Text } from 'tamagui';
-import { Search, Edit, Archive, Trash2, MessageSquare } from 'lucide-react-native';
+import { Search, Edit, Archive, Trash2, MessageSquare, Image as ImageIcon, Mic, FileText, X } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { decryptMessage } from '../../src/utils/cryptoUtils';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import { api } from '../../src/services/api';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, withRepeat, withTiming } from 'react-native-reanimated';
 import { GradientBackground } from '../../src/components/ThemeComponents';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { TOKENS } from '../../src/theme/tokens';
+
 
 const AVATAR_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const getColor = (name: string) => {
@@ -32,15 +36,109 @@ const formatTime = (dateStr: string) => {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-const getLastMessageText = (lastMessage: any) => {
-  if (!lastMessage) return 'No messages yet';
-  if (lastMessage.mediaType === 'image') return '📷 Photo';
-  if (lastMessage.mediaType === 'audio') return '🎤 Voice message';
-  if (lastMessage.mediaType === 'document') return '📄 Document';
-  return lastMessage.text || 'Message';
+const getLastMessagePreview = (lastMessage: any) => {
+  if (!lastMessage) return <Text style={styles.msgText} numberOfLines={1}>No messages yet</Text>;
+  if (lastMessage.mediaType === 'image') return (
+    <XStack space="$1.5" alignItems="center">
+      <View style={[styles.chipBase, { backgroundColor: '#e0f2fe' }]}><ImageIcon size={10} color="#0284c7" /></View>
+      <Text style={styles.msgText}>Photo</Text>
+    </XStack>
+  );
+  if (lastMessage.mediaType === 'audio') return (
+    <XStack space="$1.5" alignItems="center">
+      <View style={[styles.chipBase, { backgroundColor: '#f3e8ff' }]}><Mic size={10} color="#9333ea" /></View>
+      <Text style={styles.msgText}>Voice message</Text>
+    </XStack>
+  );
+  if (lastMessage.mediaType === 'document') return (
+    <XStack space="$1.5" alignItems="center">
+      <View style={[styles.chipBase, { backgroundColor: '#ffedd5' }]}><FileText size={10} color="#ea580c" /></View>
+      <Text style={styles.msgText}>Document</Text>
+    </XStack>
+  );
+  return <Text style={styles.msgText} numberOfLines={1}>{lastMessage.text || 'Message'}</Text>;
+};
+
+const ScaleButton = ({ onPress, style, children }: any) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPressIn={() => { scale.value = withSpring(0.92, { damping: 15 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15 }); }}
+      onPress={() => {
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress?.();
+      }}
+      style={style}
+    >
+      <Animated.View style={animatedStyle}>{children}</Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+const PulseDot = () => {
+  const scale = useSharedValue(0.8);
+  const opacity = useSharedValue(0.8);
+  useEffect(() => {
+    scale.value = withRepeat(withTiming(1.5, { duration: 1500 }), -1, true);
+    opacity.value = withRepeat(withTiming(0, { duration: 1500 }), -1, true);
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }], opacity: opacity.value
+  }));
+  return (
+    <View style={styles.onlineDotWrapper}>
+      <Animated.View style={[styles.onlineDotGlow, style]} />
+      <View style={styles.onlineDot} />
+    </View>
+  );
+};
+
+const EmptyPulseIcon = ({ isSearch }: { isSearch: boolean }) => {
+  const scale = useSharedValue(0.95);
+  useEffect(() => {
+    scale.value = withRepeat(withTiming(1.05, { duration: 2000 }), -1, true);
+  }, []);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <Animated.View style={[styles.emptyIconBadge, style]}>
+      <LinearGradient colors={['#e0e7ff', '#fae8ff']} style={StyleSheet.absoluteFillObject} />
+      {isSearch ? <Search color="#6366f1" size={32} /> : <MessageSquare color="#6366f1" size={32} style={{ zIndex: 1 }} />}
+    </Animated.View>
+  );
+};
+
+const SkeletonRow = ({ index }: { index: number }) => {
+  const translateX = useSharedValue(-200);
+  useEffect(() => { translateX.value = withRepeat(withTiming(400, { duration: 1200 }), -1, false); }, []);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 40)} style={styles.chatRow}>
+       <View style={[styles.avatar, {backgroundColor: '#e2e8f0', overflow: 'hidden'}]}>
+          <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
+            <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
+          </Animated.View>
+       </View>
+       <YStack flex={1} marginLeft="$3" space="$2" justifyContent="center">
+         <View style={{width: '40%', height: 16, backgroundColor: '#e2e8f0', borderRadius: TOKENS.RADIUS.SM, overflow: 'hidden'}}>
+            <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
+              <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
+            </Animated.View>
+         </View>
+         <View style={{width: '70%', height: 14, backgroundColor: '#f1f5f9', borderRadius: 7, overflow: 'hidden'}}>
+            <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
+              <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
+            </Animated.View>
+         </View>
+       </YStack>
+    </Animated.View>
+  );
 };
 
 export default function MessagesScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
   const [conversations, setConversations] = useState<any[]>([]);
@@ -48,28 +146,41 @@ export default function MessagesScreen() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const deleteChat = (id) => {
     Alert.alert('Delete Chat', 'Are you sure you want to delete this conversation?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-         setConversations(prev => prev.filter(c => c.id !== id));
-         setFiltered(prev => prev.filter(c => c.id !== id));
+         setConversations(prev => prev.filter(c => c.contact?.id !== id));
+         setFiltered(prev => prev.filter(c => c.contact?.id !== id));
       } }
     ]);
   };
 
-  const renderRightActions = (id) => (
-    <View style={{ flexDirection: 'row', width: 140 }}>
-      <TouchableOpacity style={{ flex: 1, backgroundColor: '#f59e0b', justifyContent: 'center', alignItems: 'center' }}>
-        <Archive color="#fff" size={24} />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => deleteChat(id)} style={{ flex: 1, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center' }}>
-        <Trash2 color="#fff" size={24} />
-      </TouchableOpacity>
-    </View>
-  );
-
+  const renderRightActions = (id, progress: RNAnimated.AnimatedInterpolation<number>, dragX: RNAnimated.AnimatedInterpolation<number>) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, -50, 0],
+      outputRange: [1, 0.5, 0],
+      extrapolate: 'clamp',
+    });
+    return (
+      <View style={styles.swipeActionsContainer}>
+        <TouchableOpacity style={styles.swipeActionBtn} onPress={() => {}}>
+           <LinearGradient colors={TOKENS.GRADIENTS.GOLD} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+           <RNAnimated.View style={{ transform: [{ scale }], zIndex: 1 }}>
+             <Archive color="#fff" size={22} />
+           </RNAnimated.View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => deleteChat(id)} style={[styles.swipeActionBtn, styles.swipeActionBtnRight]}>
+           <LinearGradient colors={TOKENS.GRADIENTS.DANGER} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+           <RNAnimated.View style={{ transform: [{ scale }], zIndex: 1 }}>
+             <Trash2 color="#fff" size={22} />
+           </RNAnimated.View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const loadConversations = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -108,71 +219,86 @@ export default function MessagesScreen() {
 
   const onRefresh = () => loadConversations(true);
 
+  const searchScale = useSharedValue(1);
+  const searchAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: searchScale.value }],
+    shadowColor: isSearchFocused ? '#005eb8' : '#64748b',
+    shadowOpacity: isSearchFocused ? 0.2 : 0.08,
+    shadowRadius: isSearchFocused ? 12 : 8,
+    elevation: isSearchFocused ? 6 : 2,
+    borderColor: isSearchFocused ? 'rgba(0, 94, 184, 0.3)' : '#e2e8f0',
+  }));
+
+  useEffect(() => {
+    searchScale.value = withTiming(isSearchFocused ? 1.02 : 1, { duration: 200 });
+  }, [isSearchFocused]);
+
   if (loading) {
     return (
-      <GradientBackground style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.header}>
-            <Text fontSize={28} fontWeight="900" color="#005eb8" letterSpacing={-0.5}>UniCom</Text>
+            <Text style={styles.appTitle}>UniCom</Text>
           </View>
           <View style={styles.searchContainer}>
-            <View style={{width: '100%', height: 20, backgroundColor: '#f1f5f9', borderRadius: 10}} />
+            <View style={[styles.searchBar, { backgroundColor: '#fff', borderColor: '#e2e8f0', shadowOpacity: 0.05 }]} />
           </View>
           <View style={{flex: 1}}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Animated.View key={i} entering={FadeInDown.delay(i * 50)} style={[styles.chatRow, styles.chatRowBorder]}>
-                <View style={[styles.avatar, {backgroundColor: '#f1f5f9'}]} />
-                <YStack flex={1} marginLeft="$3" space="$2" justifyContent="center">
-                  <View style={{width: '50%', height: 16, backgroundColor: '#f1f5f9', borderRadius: 8}} />
-                  <View style={{width: '80%', height: 14, backgroundColor: '#f8fafc', borderRadius: 7}} />
-                </YStack>
-              </Animated.View>
-            ))}
+            {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonRow key={i} index={i} />)}
           </View>
         </SafeAreaView>
-      </GradientBackground>
+      </View>
     );
   }
 
   return (
-    <GradientBackground style={{ flex: 1 }}>
+    <View style={styles.container}>
+      <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(400)}>
           <View style={styles.header}>
-            <Text fontSize={28} fontWeight="900" color="#005eb8" letterSpacing={-0.5}>UniCom</Text>
-            <TouchableOpacity style={styles.headerIconBtn} onPress={() => console.log('Edit pressed')}>
-              <Edit color="#005eb8" size={22} />
-            </TouchableOpacity>
+            <Text style={styles.appTitle}>UniCom</Text>
+            <ScaleButton onPress={() => console.log('Edit pressed')} style={styles.headerIconBtnShadow}>
+              <View style={styles.headerIconBtn}>
+                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+                <Edit color="#fff" size={20} style={{ zIndex: 1 }} />
+              </View>
+            </ScaleButton>
           </View>
 
           {/* Search */}
           <View style={styles.searchContainer}>
-            <Search color="#94a3b8" size={18} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search conversations..."
-              placeholderTextColor="#94a3b8"
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Text color="#94a3b8" fontSize={18} lineHeight={20}>×</Text>
-              </TouchableOpacity>
-            )}
+            <Animated.View style={[styles.searchBar, searchAnimatedStyle]}>
+              <Search color={isSearchFocused ? "#005eb8" : "#94a3b8"} size={18} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search conversations..."
+                placeholderTextColor="#94a3b8"
+                value={search}
+                onChangeText={setSearch}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+              />
+              {search.length > 0 && (
+                <Animated.View entering={FadeInDown.duration(200)}>
+                  <TouchableOpacity onPress={() => setSearch('')} style={styles.clearBtn} activeOpacity={0.6}>
+                    <X color={TOKENS.COLORS.TEXT_SECONDARY} size={16} />
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+            </Animated.View>
           </View>
         </Animated.View>
 
         {filtered.length === 0 ? (
           <Animated.View entering={FadeInUp.delay(200)} style={styles.emptyState}>
-            <View style={[styles.emptyIcon, { backgroundColor: '#eff6ff', shadowColor: '#005eb8', shadowOpacity: 0.1, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 5 }]}>
-              <MessageSquare color="#005eb8" size={42} strokeWidth={1.5} />
-            </View>
-            <Text fontSize={22} fontWeight="800" color="#0f172a" marginTop="$5">
+            <EmptyPulseIcon isSearch={!!search} />
+            <Text fontSize={22} fontWeight="800" color={TOKENS.COLORS.TEXT_PRIMARY} marginTop="$5">
               {search ? 'No results found' : 'No messages yet'}
             </Text>
-            <Text fontSize={15} color="#64748b" marginTop="$2" textAlign="center" paddingHorizontal="$4" lineHeight={22}>
+            <Text fontSize={15} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop="$2" textAlign="center" paddingHorizontal="$4" lineHeight={22}>
               {search ? `We couldn't find any chats matching "${search}"` : 'Your inbox is empty. Start a new conversation and experience seamless translation!'}
             </Text>
           </Animated.View>
@@ -180,7 +306,7 @@ export default function MessagesScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#005eb8" />}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{ paddingBottom: Math.max((insets?.bottom || 0) + 120, 140) }}
           >
             {filtered.map((conv, index) => {
               const contact = conv.contact;
@@ -191,48 +317,53 @@ export default function MessagesScreen() {
               const lastMsg = conv.lastMessage;
               const unread = conv.unreadCount || 0;
               const isOnline = contact.onlineStatus === 'online';
+              const isUnread = unread > 0;
 
               return (
-                <Animated.View key={conv.chatId} entering={FadeInUp.delay(index * 40)}>
-                  <Swipeable renderRightActions={() => renderRightActions(contact.id)}>
-                    <TouchableOpacity style={[styles.chatRow, index < filtered.length - 1 && styles.chatRowBorder]}
-                    onPress={() => router.push(`/chat/${contact.id}`)}
-                    activeOpacity={0.7}
-                  >
-                    {/* Avatar with online dot */}
-                    <View style={styles.avatarWrapper}>
-                      {contact.avatar ? (
-                        <Image source={{ uri: contact.avatar }} style={styles.avatar} />
-                      ) : (
-                        <View style={[styles.avatar, { backgroundColor: avatarBg, alignItems: 'center', justifyContent: 'center' }]}>
-                          <Text color="#fff" fontWeight="900" fontSize={20}>{initial}</Text>
+                <Animated.View key={conv.chatId || contact.id} entering={FadeInUp.delay(index * 60)}>
+                  <Swipeable renderRightActions={(progress, dragX) => renderRightActions(contact.id, progress, dragX)} rightThreshold={40} overshootRight={false}>
+                    <TouchableHighlight 
+                      style={[styles.chatRow, isUnread && styles.chatRowUnread]}
+                      onPress={() => router.push(`/chat/${contact.id}`)}
+                      underlayColor="#e2e8f0"
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        {/* Avatar */}
+                        <View style={styles.avatarWrapper}>
+                          {contact.avatar ? (
+                            <Image source={{ uri: contact.avatar }} style={styles.avatar} />
+                          ) : (
+                            <View style={[styles.avatar, { backgroundColor: avatarBg, alignItems: 'center', justifyContent: 'center' }]}>
+                              <Text color="#fff" fontWeight="900" fontSize={20}>{initial}</Text>
+                            </View>
+                          )}
+                          {isOnline && <PulseDot />}
                         </View>
-                      )}
-                      {isOnline && <View style={styles.onlineDot} />}
-                    </View>
 
-                    {/* Content */}
-                    <YStack flex={1} marginLeft="$3">
-                      <XStack justifyContent="space-between" alignItems="center">
-                        <Text fontWeight={unread > 0 ? '800' : '600'} fontSize={16} color="#0f172a" numberOfLines={1} flex={1}>
-                          {name}
-                        </Text>
-                        <Text fontSize={12} color={unread > 0 ? '#005eb8' : '#94a3b8'} fontWeight={unread > 0 ? '700' : '400'} marginLeft="$2">
-                          {formatTime(lastMsg?.createdAt || '')}
-                        </Text>
-                      </XStack>
-                      <XStack justifyContent="space-between" alignItems="center" marginTop={3}>
-                        <Text fontSize={14} color={unread > 0 ? '#475569' : '#94a3b8'} numberOfLines={1} flex={1} fontWeight={unread > 0 ? '600' : '400'}>
-                          {getLastMessageText(lastMsg)}
-                        </Text>
-                        {unread > 0 && (
-                          <View style={styles.unreadBadge}>
-                            <Text color="#fff" fontSize={11} fontWeight="800">{unread > 99 ? '99+' : unread}</Text>
-                          </View>
-                        )}
-                      </XStack>
-                    </YStack>
-                  </TouchableOpacity>
+                        {/* Content */}
+                        <YStack flex={1} marginLeft="$3">
+                          <XStack justifyContent="space-between" alignItems="center">
+                            <Text fontWeight={isUnread ? '900' : '700'} fontSize={16} color={TOKENS.COLORS.TEXT_PRIMARY} numberOfLines={1} flex={1}>
+                              {name}
+                            </Text>
+                            <Text fontSize={12} color={isUnread ? '#005eb8' : '#94a3b8'} fontWeight={isUnread ? '800' : '600'} marginLeft="$2">
+                              {formatTime(lastMsg?.createdAt || '')}
+                            </Text>
+                          </XStack>
+                          <XStack justifyContent="space-between" alignItems="center" marginTop={4}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                              {getLastMessagePreview(lastMsg)}
+                            </View>
+                            {isUnread && (
+                              <Animated.View key={unread} entering={FadeInDown.springify()} style={styles.unreadBadgeShadow}>
+                                <LinearGradient colors={TOKENS.GRADIENTS.DANGER} start={{x:0, y:0}} end={{x:1, y:1}} style={[StyleSheet.absoluteFillObject, { borderRadius: TOKENS.RADIUS.MD }]} />
+                                <Text color="#fff" fontSize={11} fontWeight="800" style={{ zIndex: 1 }}>{unread > 99 ? '99+' : unread}</Text>
+                              </Animated.View>
+                            )}
+                          </XStack>
+                        </YStack>
+                      </View>
+                    </TouchableHighlight>
                   </Swipeable>
                 </Animated.View>
               );
@@ -240,22 +371,52 @@ export default function MessagesScreen() {
           </ScrollView>
         )}
       </SafeAreaView>
-      </GradientBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: { flex: 1, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  headerIconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f0f6ff', alignItems: 'center', justifyContent: 'center' },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  searchInput: { flex: 1, fontSize: 15, color: '#0f172a' } as any,
-  chatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 20, backgroundColor: '#fff', minHeight: 76 },
-  chatRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  avatarWrapper: { position: 'relative', width: 52, height: 52 },
-  avatar: { width: 52, height: 52, borderRadius: 26 },
-  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#fff' },
-  unreadBadge: { backgroundColor: '#ef4444', borderRadius: 12, paddingHorizontal: 6, minWidth: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginLeft: 6, shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  appTitle: {
+    fontSize: 28, fontWeight: '900', color: '#005eb8', letterSpacing: -0.5,
+    shadowColor: '#005eb8', shadowOpacity: 0.15, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2,
+  },
+  headerIconBtnShadow: {
+    shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5, borderRadius: TOKENS.RADIUS.LG,
+  },
+  headerIconBtn: { width: 40, height: 40, borderRadius: TOKENS.RADIUS.LG, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  searchContainer: { marginHorizontal: 16, marginBottom: 16 },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', 
+    paddingHorizontal: 16, height: 46, borderRadius: 23, gap: 10,
+    borderWidth: 1.5,
+  },
+  searchInput: { flex: 1, fontSize: 16, color: '#0f172a', fontWeight: '500', outlineStyle: 'none' } as any,
+  clearBtn: { width: 24, height: 24, borderRadius: TOKENS.RADIUS.MD, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  chatRow: { 
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, 
+    backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: TOKENS.RADIUS.LG,
+    ...TOKENS.SHADOWS.SUBTLE,
+  },
+  chatRowUnread: { backgroundColor: 'rgba(0, 94, 184, 0.035)' },
+  avatarWrapper: { position: 'relative', width: 56, height: 56 },
+  avatar: { width: 56, height: 56, borderRadius: TOKENS.RADIUS.XL, borderWidth: 2, borderColor: '#fff', ...TOKENS.SHADOWS.ELEVATED },
+  onlineDotWrapper: { position: 'absolute', bottom: 1, right: 1, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+  onlineDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#fff' },
+  onlineDotGlow: { position: 'absolute', width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', opacity: 0.6 },
+  msgText: { fontSize: 14, color: '#64748b', fontWeight: '500', flexShrink: 1 },
+  chipBase: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  unreadBadgeShadow: {
+    minWidth: 24, height: 24, borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5,
+  },
+  swipeActionsContainer: { 
+    flexDirection: 'row', width: 140, marginBottom: 10, marginRight: 16, 
+    borderTopRightRadius: TOKENS.RADIUS.LG, borderBottomRightRadius: TOKENS.RADIUS.LG, overflow: 'hidden' 
+  },
+  swipeActionBtn: { flex: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  swipeActionBtnRight: { borderTopRightRadius: TOKENS.RADIUS.LG, borderBottomRightRadius: TOKENS.RADIUS.LG },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: -40 },
+  emptyIconBadge: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
 });

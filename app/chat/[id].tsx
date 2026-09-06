@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ImageBackground, View, FlatList, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, Animated as RNAnimated, ScrollView, Modal, Clipboard, Image } from 'react-native';
+import { StyleSheet, ImageBackground, View, FlatList, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, Animated as RNAnimated, ScrollView, Modal, Clipboard, Image } from 'react-native';
 import { YStack, XStack, Text, Avatar, Spinner } from 'tamagui';
-import { ChevronLeft, Phone, Video, Send, Mic, Image as ImageIcon, Smile, Check, CheckCheck, Reply, Languages, X, Paperclip, Clock, FileText, Banknote, CheckSquare, Zap, SquareCheck, Square, Building, Wallet, Copy, QrCode, PlusCircle } from 'lucide-react-native';
+import { ChevronLeft, Phone, Video, Send, Mic, Image as ImageIcon, Smile, Check, CheckCheck, Reply, Languages, X, Paperclip, Clock, FileText, Banknote, CheckSquare, Zap, SquareCheck, Square, Building, Wallet, Copy, QrCode, PlusCircle, Play , CheckCircle2, AlertCircle, Info, DollarSign, ListChecks } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GradientBackground } from '../../src/components/ThemeComponents';
+import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedEmoji from '../../src/components/AnimatedEmoji';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInUp, FadeInDown, Layout } from 'react-native-reanimated';
+import Animated, { FadeInUp, FadeInDown, Layout, useSharedValue, useAnimatedStyle, withTiming, FadeOutDown } from 'react-native-reanimated';
 import { useChat } from '../../src/context/ChatContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCall } from '../../src/context/CallContext';
@@ -17,8 +18,31 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Swipeable } from 'react-native-gesture-handler';
 import EmojiPicker from '../../src/components/EmojiPickerWrapper';
-import { Keyboard } from 'react-native';
+import { Keyboard, Pressable } from 'react-native';
 import { api } from '../../src/services/api';
+import { TOKENS } from '../../src/theme/tokens';
+
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const ScaleButton = ({ onPress, children, style, ...props }: any) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <AnimatedPressable
+      onPressIn={() => {
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+        scale.value = withTiming(0.92, { duration: 100 });
+      }}
+      onPressOut={() => { scale.value = withTiming(1, { duration: 150 }); }}
+      onPress={onPress}
+      style={[animatedStyle, style]}
+      {...props}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+};
 
 export default function ChatThreadScreen() {
   const { id } = useLocalSearchParams();
@@ -77,6 +101,10 @@ export default function ChatThreadScreen() {
   const [recipient, setRecipient] = useState<any>(null);
   
   const flatListRef = useRef<FlatList>(null);
+  const [copiedRouting, setCopiedRouting] = useState(false);
+  const [copiedAccount, setCopiedAccount] = useState(false);
+  const [copiedCrypto, setCopiedCrypto] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
 
   const { activeChats } = useChat();
   
@@ -274,16 +302,14 @@ export default function ChatThreadScreen() {
 
   const renderRightActions = (progress: any, dragX: any, item: any) => {
     const scale = dragX.interpolate({
-      inputRange: [-50, 0],
-      outputRange: [1, 0],
+      inputRange: [-80, -40, 0],
+      outputRange: [1, 0.5, 0],
       extrapolate: 'clamp',
     });
     return (
-      <View style={{ width: 60, justifyContent: 'center', alignItems: 'center' }}>
-        <RNAnimated.View style={{ transform: [{ scale }] }}>
-          <View style={{ backgroundColor: 'rgba(0,94,184,0.1)', padding: 10, borderRadius: 20 }}>
-            <Reply color="#005eb8" size={20} />
-          </View>
+      <View style={{ width: 80, justifyContent: 'center', alignItems: 'center' }}>
+        <RNAnimated.View style={{ transform: [{ scale }], width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, backgroundColor: '#e0e7ff', justifyContent: 'center', alignItems: 'center' }}>
+          <Reply color="#4f46e5" size={22} />
         </RNAnimated.View>
       </View>
     );
@@ -291,11 +317,10 @@ export default function ChatThreadScreen() {
 
   const renderItem = ({ item: msg }: { item: any }) => {
     const isTranslated = translatedMessages[msg.id];
-    
     return (
       <Swipeable
-        renderRightActions={(prog, drag) => renderRightActions(prog, drag, msg)}
-        onSwipeableRightOpen={() => {
+        renderRightActions={(p, d) => renderRightActions(p, d, msg)}
+        onSwipeableOpen={() => {
           Platform.OS !== 'web' && Haptics.impactAsync();
           setReplyingTo(msg);
         }}
@@ -313,197 +338,266 @@ export default function ChatThreadScreen() {
             <AnimatedEmoji emoji={msg.text || '❤️'} />
           ) : (
             <View style={{
-              backgroundColor: msg.isSender ? '#007aff' : '#ffffff',
+              shadowColor: msg.isSender ? '#4f46e5' : '#0f172a',
+              shadowOpacity: msg.isSender ? 0.3 : 0.08,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: msg.isSender ? 6 : 2,
+              borderRadius: TOKENS.RADIUS.LG,
+              borderBottomRightRadius: msg.isSender ? 4 : 24,
+              borderBottomLeftRadius: msg.isSender ? 24 : 4,
+              backgroundColor: msg.isSender ? '#6366f1' : '#f8fafc',
+            }}>
+              <View style={{
+                backgroundColor: msg.isSender ? '#6366f1' : '#f8fafc',
                 padding: 12,
                 paddingHorizontal: 16,
-                borderRadius: 22,
-                borderBottomRightRadius: msg.isSender ? 4 : 22,
-                borderBottomLeftRadius: msg.isSender ? 22 : 4,
-                shadowColor: msg.isSender ? '#007aff' : '#000',
-                shadowOpacity: msg.isSender ? 0.2 : 0.08,
-                shadowRadius: 6,
-                shadowOffset: { width: 0, height: 3 },
-                elevation: msg.isSender ? 4 : 2,
-            }}>
-              {msg.replyToId && (
-                <View style={{ backgroundColor: 'rgba(0,0,0,0.1)', padding: 8, borderRadius: 8, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: msg.isSender ? '#fff' : '#005eb8' }}>
-                  <Text color={msg.isSender ? '#fff' : '#666'} fontSize="$2" fontWeight="bold">Replying to a message</Text>
-                </View>
-              )}
-
-              {msg.type === 'image' && msg.mediaUrl && (
-                <View style={{ marginBottom: 8, borderRadius: 10, overflow: 'hidden' }}>
-                  <Image source={{ uri: msg.mediaUrl }} style={{ width: 200, height: 200, borderRadius: 10 }} />
-                </View>
-              )}
-              {msg.type === 'audio' && msg.mediaUrl && (
-                <View style={{ marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
-                  <Mic color={msg.isSender ? '#fff' : '#005eb8'} size={20} />
-                  <Text color={msg.isSender ? '#fff' : '#005eb8'} marginLeft={8}>Voice Note</Text>
-                </View>
-              )}
-              {msg.type === 'document' && msg.mediaUrl && (
-                <View style={{ marginBottom: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.1)', padding: 10, borderRadius: 10 }}>
-                  <FileText color={msg.isSender ? '#fff' : '#005eb8'} size={24} />
-                  <Text color={msg.isSender ? '#fff' : '#333'} marginLeft={8} numberOfLines={1} flex={1} fontWeight="bold">
-                    {msg.fileName || 'Document'}
-                  </Text>
-                </View>
-              )}
-              {msg.type === 'money_request' && msg.metadata && (
-                <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: 12, minWidth: 200, alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#eee' }}>
-                  <View style={{ backgroundColor: 'rgba(0, 94, 184, 0.1)', padding: 12, borderRadius: 50, marginBottom: 8 }}>
-                    <Banknote color="#005eb8" size={32} />
-                  </View>
-                  <Text color="#666" fontSize="$3">Payment Request</Text>
-                  <Text color="#333" fontWeight="bold" fontSize="$8" marginVertical="$2">{msg.metadata.currency}{msg.metadata.amount}</Text>
-                  <TouchableOpacity onPress={() => { setActivePaymentMsg(msg); setPaymentModalVisible(true); Platform.OS !== 'web' && Haptics.impactAsync(); }} style={{ backgroundColor: '#005eb8', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, width: '100%', alignItems: 'center' }}>
-                    {msg.metadata?.status === 'paid' ? <Text color="white" fontWeight="bold">Paid</Text> : <Text color="white" fontWeight="bold">Pay Now</Text>}
-                  </TouchableOpacity>
-                </View>
-              )}
-                {(msg.type === 'todo_list' || msg.mediaType === 'todo_list') && msg.metadata?.tasks && (
-                  <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: 12, minWidth: 260, marginBottom: 8, borderWidth: 1, borderColor: '#eee' }}>
-                    <XStack alignItems="center" marginBottom="$3">
-                       <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: 8, borderRadius: 20, marginRight: 8 }}>
-                         <CheckSquare color="#3b82f6" size={20} />
-                       </View>
-                       <YStack flex={1}>
-                         <Text color="#333" fontWeight="bold" fontSize={16}>{msg.metadata.title || 'Task List'}</Text>
-                         <Text color="#666" fontSize={12}>{msg.metadata.tasks.filter((t) => t.done).length} of {msg.metadata.tasks.length} completed</Text>
-                       </YStack>
-                    </XStack>
-                    
-                    <View style={{ height: 6, backgroundColor: '#f1f5f9', borderRadius: 3, marginBottom: 12, overflow: 'hidden' }}>
-                      <View style={{ height: '100%', width: `${(msg.metadata.tasks.filter((t) => t.done).length / (msg.metadata.tasks.length||1)) * 100}%`, backgroundColor: '#3b82f6', borderRadius: 3 }} />
-                    </View>
+                borderRadius: TOKENS.RADIUS.LG,
+                borderBottomRightRadius: msg.isSender ? 4 : 24,
+                borderBottomLeftRadius: msg.isSender ? 24 : 4,
+                overflow: 'hidden'
+              }}>
+                {msg.isSender && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:1, y:1}} end={{x:0, y:0}} style={StyleSheet.absoluteFillObject} />}
                 
-                    <YStack space="$2">
-                      {msg.metadata.tasks.map((task, index) => (
-                        <TouchableOpacity key={task.id} onPress={() => toggleTask(msg.id, task.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
-                           <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: task.done ? '#3b82f6' : '#cbd5e1', backgroundColor: task.done ? '#3b82f6' : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                              {task.done && <Check color="#fff" size={14} strokeWidth={3} />}
-                           </View>
-                           <Text color={task.done ? '#94a3b8' : '#333'} style={{ textDecorationLine: task.done ? 'line-through' : 'none', flex: 1 }}>{task.title}</Text>
-                             {task.price > 0 && (
-                                <Text color="#10b981" fontWeight="bold" fontSize={12} style={{ marginLeft: 8 }}>${task.price}</Text>
-                             )}
-                        </TouchableOpacity>
+                {msg.replyToId && (
+                  <View style={{ backgroundColor: msg.isSender ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.08)', padding: 10, borderRadius: TOKENS.RADIUS.MD, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: msg.isSender ? '#fff' : '#6366f1' }}>
+                    <Text color={msg.isSender ? 'rgba(255,255,255,0.8)' : '#6366f1'} fontSize="$2" fontWeight="800" marginBottom={2}>Replying to message</Text>
+                    <Text color={msg.isSender ? '#fff' : '#334155'} fontSize="$3" numberOfLines={1}>Tap to view previous context...</Text>
+                  </View>
+                )}
+
+                {msg.type === 'image' && msg.mediaUrl && (
+                  <View style={{ marginBottom: 10, borderRadius: TOKENS.RADIUS.MD, ...TOKENS.SHADOWS.ELEVATED }}>
+                    <Image source={{ uri: msg.mediaUrl }} style={{ width: 220, height: 220, borderRadius: TOKENS.RADIUS.MD }} />
+                  </View>
+                )}
+                {msg.type === 'audio' && msg.mediaUrl && (
+                  <View style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: msg.isSender ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: TOKENS.RADIUS.XL }}>
+                    <TouchableOpacity 
+                      onPress={async () => {
+                        try {
+                          const { sound } = await Audio.Sound.createAsync({ uri: msg.mediaUrl });
+                          await sound.playAsync();
+                          sound.setOnPlaybackStatusUpdate((status) => {
+                            if (status.isLoaded && status.didJustFinish) { sound.unloadAsync(); }
+                          });
+                        } catch (e) { console.log('Audio play error:', e); }
+                      }}
+                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: msg.isSender ? '#fff' : '#6366f1', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                      <Play color={msg.isSender ? '#6366f1' : '#fff'} size={18} />
+                    </TouchableOpacity>
+                    <XStack space="$1" alignItems="center">
+                      {[12, 18, 10, 24, 14, 20, 16, 10, 18].map((h, i) => (
+                        <View key={i} style={{ width: 3, height: h, backgroundColor: msg.isSender ? 'rgba(255,255,255,0.8)' : '#6366f1', borderRadius: 2 }} />
                       ))}
+                    </XStack>
+                    <Text color={msg.isSender ? '#fff' : '#6366f1'} marginLeft={12} fontSize={12} fontWeight="700">{msg.metadata?.duration ? `${Math.floor(msg.metadata.duration / 60)}:${String(msg.metadata.duration % 60).padStart(2, '0')}` : '0:00'}</Text>
+                  </View>
+                )}
+                {msg.type === 'document' && msg.mediaUrl && (
+                  <View style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: msg.isSender ? 'rgba(255,255,255,0.2)' : 'rgba(59,130,246,0.1)', padding: 12, borderRadius: TOKENS.RADIUS.MD }}>
+                    <View style={{ padding: 10, borderRadius: TOKENS.RADIUS.MD, backgroundColor: msg.isSender ? '#fff' : '#3b82f6', marginRight: 12 }}>
+                      <FileText color={msg.isSender ? '#3b82f6' : '#fff'} size={20} />
+                    </View>
+                    <YStack flex={1}>
+                      <Text color={msg.isSender ? '#fff' : '#0f172a'} numberOfLines={1} fontWeight="bold">{msg.fileName || 'Document'}</Text>
+                      <Text color={msg.isSender ? 'rgba(255,255,255,0.8)' : '#64748b'} fontSize={12} marginTop={2}>FILE ATTACHMENT</Text>
                     </YStack>
                   </View>
                 )}
-              {msg.type === 'checklist' && msg.metadata && (
-                <View style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: 12, borderRadius: 12, marginBottom: 8, minWidth: 200 }}>
-                  <Text fontWeight="bold" marginBottom="$2" color={msg.isSender ? '#fff' : '#333'}>{msg.text}</Text>
-                  {msg.metadata.items.map((item: any) => (
-                    <TouchableOpacity key={item.id} onPress={() => { Platform.OS !== 'web' && Haptics.selectionAsync(); toggleChecklistItem(id as string, msg.id, item.id); }}>
-                      <XStack space="$2" alignItems="center" marginBottom="$2">
-                        {item.done ? <SquareCheck color={msg.isSender ? '#fff' : '#005eb8'} size={20} /> : <Square color={msg.isSender ? 'rgba(255,255,255,0.5)' : '#999'} size={20} />}
-                        <Text color={msg.isSender ? '#fff' : '#333'} textDecorationLine={item.done ? 'line-through' : 'none'}>{item.text}</Text>
-                      </XStack>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-              {msg.type === 'text' && msg.text && !msg.emoji ? (
-                <Text color={msg.isSender ? '#fff' : '#333'} fontSize="$4">
-                  {isTranslated ? "*(Translated)* " + (msg.metadata?.translatedText || "Translation unavailable") : msg.text}
-                </Text>
-              ) : null}
-              {msg.emoji ? (
-                <AnimatedEmoji emoji={msg.text} />
-              ) : null}
-              <XStack justifyContent="flex-end" alignItems="center" marginTop="$2" space="$2">
-                {msg.status === 'scheduled' && <Clock size={12} color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#999'} />}
-                {!msg.isSender && msg.type === 'text' && (
-                  <TouchableOpacity onPress={() => toggleTranslation(msg.id)}>
-                    <Languages size={16} color="#999" />
-                  </TouchableOpacity>
+                {msg.type === 'money_request' && msg.metadata && (
+                  <View style={{ backgroundColor: '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 220, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
+                    <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <View style={{ padding: 14, borderRadius: TOKENS.RADIUS.XL, marginBottom: 12, overflow: 'hidden' }}>
+                        <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                        <Banknote color="#fff" size={28} />
+                      </View>
+                      <Text color={TOKENS.COLORS.SUCCESS} fontSize="$3" fontWeight="700">Payment Request</Text>
+                      <Text color="#064e3b" fontWeight="900" fontSize="$8" marginVertical="$2">{msg.metadata.currency}{msg.metadata.amount}</Text>
+                      
+                      {msg.metadata?.status === 'paid' ? (
+                         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10b981', paddingVertical: 12, paddingHorizontal: 24, borderRadius: TOKENS.RADIUS.LG, width: '100%', justifyContent: 'center' }}>
+                           <Check color="#fff" size={20} strokeWidth={3} style={{ marginRight: 8 }} />
+                           <Text color="white" fontWeight="bold">Paid</Text>
+                         </View>
+                      ) : (
+                         <ScaleButton onPress={() => { setActivePaymentMsg(msg); setPaymentModalVisible(true); Platform.OS !== 'web' && Haptics.impactAsync(); }} style={{ width: '100%', overflow: 'hidden', borderRadius: TOKENS.RADIUS.LG }}>
+                           <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                           <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                             <Text color="white" fontWeight="bold" fontSize={16}>Pay Now</Text>
+                           </View>
+                         </ScaleButton>
+                      )}
+                    </View>
+                  </View>
                 )}
-                <Text color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#999'} fontSize="$2">
-                  {msg.time}
-                </Text>
-                {msg.isSender && (
-                  msg.status === 'read' ? <CheckCheck size={14} color="#7abeff" /> : 
-                  msg.status === 'delivered' ? <CheckCheck size={14} color="rgba(255,255,255,0.7)" /> :
-                  <Check size={14} color="rgba(255,255,255,0.7)" />
+                  {(msg.type === 'todo_list' || msg.mediaType === 'todo_list') && msg.metadata?.tasks && (
+                    <View style={{ backgroundColor: '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 260, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
+                      <View style={{ padding: 16 }}>
+                        <XStack alignItems="center" marginBottom="$4">
+                           <View style={{ width: 40, height: 40, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                             <CheckSquare color="#fff" size={20} />
+                           </View>
+                           <YStack flex={1}>
+                             <Text color={TOKENS.COLORS.TEXT_PRIMARY} fontWeight="800" fontSize={16}>{msg.metadata.title || 'Task List'}</Text>
+                             <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize={12} fontWeight="600">{msg.metadata.tasks.filter((t: any) => t.done).length} of {msg.metadata.tasks.length} completed</Text>
+                           </YStack>
+                        </XStack>
+                        
+                        <View style={{ height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, marginBottom: 16, overflow: 'hidden' }}>
+                          <View style={{ height: '100%', width: `${(msg.metadata.tasks.filter((t: any) => t.done).length / (msg.metadata.tasks.length||1)) * 100}%`, borderRadius: 4 }}>
+                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
+                          </View>
+                        </View>
+                    
+                        <YStack space="$3">
+                          {msg.metadata.tasks.map((task: any) => (
+                            <ScaleButton key={task.id} onPress={() => toggleTask(msg.id, task.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4 }}>
+                               <View style={{ width: 24, height: 24, borderRadius: TOKENS.RADIUS.SM, borderWidth: 2, borderColor: task.done ? '#6366f1' : '#cbd5e1', backgroundColor: task.done ? '#6366f1' : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                  {task.done && <Check color="#fff" size={14} strokeWidth={3.5} />}
+                               </View>
+                               <Text color={task.done ? '#94a3b8' : '#0f172a'} fontWeight={task.done ? "500" : "600"} style={{ textDecorationLine: task.done ? 'line-through' : 'none', flex: 1 }}>{task.title}</Text>
+                                 {task.price > 0 && (
+                                    <Text color={TOKENS.COLORS.SUCCESS} fontWeight="800" fontSize={13} style={{ marginLeft: 8 }}>${task.price}</Text>
+                                 )}
+                            </ScaleButton>
+                          ))}
+                        </YStack>
+                      </View>
+                    </View>
+                  )}
+                {msg.type === 'checklist' && msg.metadata && (
+                  <View style={{ backgroundColor: msg.isSender ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.08)', padding: 14, borderRadius: TOKENS.RADIUS.MD, marginBottom: 10, minWidth: 200 }}>
+                    <Text fontWeight="800" marginBottom="$3" color={msg.isSender ? '#fff' : '#0f172a'}>{msg.text}</Text>
+                    {msg.metadata.items.map((item: any) => (
+                      <ScaleButton key={item.id} onPress={() => { toggleChecklistItem(id as string, msg.id, item.id); }} style={{ paddingVertical: 4 }}>
+                        <XStack space="$3" alignItems="center" marginBottom="$2">
+                          <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: item.done ? (msg.isSender ? '#fff' : '#6366f1') : (msg.isSender ? 'rgba(255,255,255,0.5)' : '#cbd5e1'), backgroundColor: item.done ? (msg.isSender ? '#fff' : '#6366f1') : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                            {item.done && <Check color={msg.isSender ? '#6366f1' : '#fff'} size={12} strokeWidth={4} />}
+                          </View>
+                          <Text color={msg.isSender ? (item.done ? 'rgba(255,255,255,0.6)' : '#fff') : (item.done ? '#94a3b8' : '#334155')} fontWeight={item.done ? "500" : "600"} textDecorationLine={item.done ? 'line-through' : 'none'}>{item.text}</Text>
+                        </XStack>
+                      </ScaleButton>
+                    ))}
+                  </View>
                 )}
-              </XStack>
+                {msg.type === 'text' && msg.text && !msg.emoji ? (
+                  <Text color={msg.isSender ? '#fff' : '#1e293b'} fontSize="$4" fontWeight="500" lineHeight={22}>
+                    {isTranslated ? "*(Translated)* " + (msg.metadata?.translatedText || "Translation unavailable") : msg.text}
+                  </Text>
+                ) : null}
+                <XStack justifyContent="flex-end" alignItems="center" marginTop="$2" space="$2">
+                  {msg.status === 'scheduled' && <Clock size={12} color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#999'} />}
+                  {!msg.isSender && msg.type === 'text' && (
+                    <ScaleButton onPress={() => toggleTranslation(msg.id)} style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(99,102,241,0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                      <Languages size={14} color="#6366f1" />
+                    </ScaleButton>
+                  )}
+                  <Text color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#94a3b8'} fontSize="$2" fontWeight="600">
+                    {msg.time}
+                  </Text>
+                  {msg.isSender && (
+                    msg.status === 'read' ? <CheckCheck size={16} color="#38bdf8" /> : 
+                    msg.status === 'delivered' ? <CheckCheck size={16} color="rgba(255,255,255,0.6)" /> :
+                    <Check size={16} color="rgba(255,255,255,0.6)" />
+                  )}
+                </XStack>
+              </View>
             </View>
           )}
         </Animated.View>
       </Swipeable>
     );
   };
-
   const renderBackground = (children: React.ReactNode) => {
     if (user?.chat_wallpaper && user.chat_wallpaper !== 'default') {
       return (
         <ImageBackground source={{ uri: user.chat_wallpaper }} style={{ flex: 1 }} resizeMode="cover">
-          {children}
+          <View style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.4)' }}>
+            {children}
+          </View>
         </ImageBackground>
       );
     }
-    return <GradientBackground paddingHorizontal="$0">{children}</GradientBackground>;
+    return (
+      <View style={{ flex: 1 }}>
+        <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+        {children}
+      </View>
+    );
   };
 
   return renderBackground(
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
-      <XStack padding="$3" paddingTop="$5" paddingBottom="$3" alignItems="center" justifyContent="space-between" backgroundColor="rgba(255,255,255,0.95)" shadowColor="#000" shadowOpacity={0.08} shadowRadius={8} shadowOffset={{ width: 0, height: 4 }} elevation={4} borderBottomWidth={1} borderBottomColor="rgba(0,0,0,0.05)">
-        <XStack space="$3" alignItems="center">
-          <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(main)/messages')} style={{ padding: 6, backgroundColor: '#f0f4f8', borderRadius: 20 }}>
-            <ChevronLeft color="#333" size={24} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push(`/profile/${id}`)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ shadowColor: '#005eb8', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}>
-              {(recipient?.profile_picture || recipient?.avatar) ? (
-                <Image source={{ uri: (recipient?.profile_picture || recipient?.avatar || '') }} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#fff' }} onError={(e) => console.log('Image Error', e)} />
-              ) : (
-                <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#fff', backgroundColor: '#e6e6e6', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text color="#666" fontSize="$3" fontWeight="bold">{recipient?.name?.charAt(0).toUpperCase() || 'U'}</Text>
+      <View style={{ backgroundColor: 'transparent', zIndex: 10 }}>
+        <LinearGradient colors={['rgba(255,255,255,0.98)', 'rgba(255,255,255,0.92)']} style={StyleSheet.absoluteFillObject} />
+        <XStack padding="$3" paddingTop="$5" paddingBottom="$3" alignItems="center" justifyContent="space-between" shadowColor="#0f172a" shadowOpacity={0.12} shadowRadius={12} shadowOffset={{ width: 0, height: 6 }} elevation={8} borderBottomWidth={1} borderBottomColor="rgba(0,0,0,0.03)">
+          <XStack space="$3" alignItems="center">
+            <ScaleButton onPress={() => router.canGoBack() ? router.back() : router.replace('/(main)/messages')} style={{ width: 40, height: 40, backgroundColor: '#fff', borderRadius: TOKENS.RADIUS.LG, justifyContent: 'center', alignItems: 'center', ...TOKENS.SHADOWS.SUBTLE }}>
+              <ChevronLeft color="#334155" size={24} />
+            </ScaleButton>
+            <TouchableOpacity onPress={() => router.push(`/profile/${id}`)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ position: 'relative' }}>
+                <View style={{ padding: 2, borderRadius: TOKENS.RADIUS.LG, backgroundColor: '#fff', ...TOKENS.SHADOWS.ELEVATED }}>
+                  {(recipient?.profile_picture || recipient?.avatar) ? (
+                    <Image source={{ uri: (recipient?.profile_picture || recipient?.avatar || '') }} style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG }} onError={(e) => console.log('Image Error', e)} />
+                  ) : (
+                    <View style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize="$4" fontWeight="bold">{recipient?.name?.charAt(0).toUpperCase() || 'U'}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-            <YStack marginLeft="$3">
-              <Text fontWeight="bold" fontSize="$5" color="#333">{recipient?.name || 'Unknown User'}</Text>
-              <Text fontSize="$2" color={onlineUsers[id] ? '#27ae60' : '#999'} fontWeight="500">
-                {onlineUsers[id] ? 'Online' : 'Offline'}
-              </Text>
-            </YStack>
-          </TouchableOpacity>
-        </XStack>
-        <XStack space="$3">
-            <TouchableOpacity 
-              onPress={async () => {
-                try {
-                  const peer = { id: id as string, name: recipient?.name || 'Unknown', avatar: recipient?.profile_picture, phone: recipient?.phone_number };
-                  const res = await startVoiceCall(peer, false);
-                  if (res && res.call) router.push(`/call/${res.call.id}`);
-                } catch (e) {
-                  console.error(e);
-                }
-              }}
-              style={{ padding: 10, backgroundColor: 'rgba(39, 174, 96, 0.1)', borderRadius: 20 }}
-            >
-              <Phone color="#27ae60" size={20} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={async () => {
-                try {
-                  const peer = { id: id as string, name: recipient?.name || 'Unknown', avatar: recipient?.profile_picture, phone: recipient?.phone_number };
-                  const res = await startVoiceCall(peer, true);
-                  if (res && res.call) router.push(`/call/${res.call.id}`);
-                } catch (e) {
-                  console.error(e);
-                }
-              }}
-              style={{ padding: 10, backgroundColor: 'rgba(0, 94, 184, 0.1)', borderRadius: 20 }}
-            >
-              <Video color="#005eb8" size={20} />
+                {onlineUsers[id as string] && (
+                  <View style={{ position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10b981', borderWidth: 2, borderColor: '#fff', shadowColor: '#10b981', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4, elevation: 2 }} />
+                )}
+              </View>
+              <YStack marginLeft="$3">
+                <Text fontWeight="bold" fontSize="$5" color={TOKENS.COLORS.TEXT_PRIMARY}>{recipient?.name || 'Unknown User'}</Text>
+                <XStack alignItems="center" space="$1.5" marginTop={2}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: onlineUsers[id as string] ? '#10b981' : '#94a3b8' }} />
+                  <Text fontSize="$2" color={onlineUsers[id as string] ? '#059669' : '#64748b'} fontWeight="600">
+                    {onlineUsers[id as string] ? (isTyping[id as string] ? 'Typing...' : 'Online') : 'Offline'}
+                  </Text>
+                </XStack>
+              </YStack>
             </TouchableOpacity>
           </XStack>
-      </XStack>
+          <XStack space="$2.5">
+              <ScaleButton 
+                onPress={async () => {
+                  try {
+                    const peer = { id: id as string, name: recipient?.name || 'Unknown', avatar: recipient?.profile_picture, phone: recipient?.phone_number };
+                    const res = await startVoiceCall(peer, false);
+                    if (res && res.call) router.push(`/call/${res.call.id}`);
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#10b981', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
+              >
+                <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                <Phone color="#fff" size={18} />
+              </ScaleButton>
+              <ScaleButton 
+                onPress={async () => {
+                  try {
+                    const peer = { id: id as string, name: recipient?.name || 'Unknown', avatar: recipient?.profile_picture, phone: recipient?.phone_number };
+                    const res = await startVoiceCall(peer, true);
+                    if (res && res.call) router.push(`/call/${res.call.id}`);
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#6366f1', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+              >
+                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                <Video color="#fff" size={18} />
+              </ScaleButton>
+            </XStack>
+        </XStack>
+      </View>
 
       {/* Messages */}
       <FlatList
@@ -519,82 +613,112 @@ export default function ChatThreadScreen() {
       />
 
       {/* Payment Modal */}
-      <Modal visible={paymentModalVisible} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' }}>
+      <Modal visible={paymentModalVisible} transparent animationType="fade">
+        <Animated.View entering={FadeInDown.duration(200)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <Animated.View entering={FadeInDown.springify().damping(15).delay(100)} style={{ backgroundColor: '#fff', borderTopLeftRadius: TOKENS.RADIUS.XL, borderTopRightRadius: TOKENS.RADIUS.XL, padding: 20, maxHeight: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 }}>
+            {/* Drag Handle */}
+            <View style={{ width: 40, height: 4, backgroundColor: '#cbd5e1', borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
+            
             <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-              <Text fontWeight="bold" fontSize="$6">Make Payment</Text>
-              <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
-                <X color="#666" size={24} />
-              </TouchableOpacity>
+              <XStack alignItems="center" space="$2">
+                <View style={{ width: 32, height: 32, borderRadius: 16, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
+                  <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                  <Banknote color="#fff" size={16} />
+                </View>
+                <Text fontWeight="800" fontSize="$6" color={TOKENS.COLORS.TEXT_PRIMARY}>Make Payment</Text>
+              </XStack>
+              <ScaleButton onPress={() => setPaymentModalVisible(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' }}>
+                <X color={TOKENS.COLORS.TEXT_SECONDARY} size={18} />
+              </ScaleButton>
             </XStack>
             
-            <View style={{ backgroundColor: '#f0f8ff', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 20 }}>
-              <Text color="#666">Amount to Pay</Text>
-              <Text fontWeight="bold" fontSize="$8" color="#005eb8">{activePaymentMsg?.metadata?.currency}{activePaymentMsg?.metadata?.amount}</Text>
+            <View style={{ overflow: 'hidden', padding: 20, borderRadius: TOKENS.RADIUS.LG, alignItems: 'center', marginBottom: 20, ...TOKENS.SHADOWS.SUBTLE }}>
+              <LinearGradient colors={['#ecfdf5', '#ccfbf1']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+              <Text color={TOKENS.COLORS.SUCCESS} fontWeight="600" fontSize="$3" marginBottom={4}>Requested Amount</Text>
+              <Text fontWeight="900" fontSize={42} color={TOKENS.COLORS.SUCCESS} letterSpacing={-1}>{activePaymentMsg?.metadata?.currency}{activePaymentMsg?.metadata?.amount}</Text>
             </View>
 
-            <XStack space="$2" marginBottom="$4">
-              <TouchableOpacity onPress={() => setSelectedPaymentMethod('bank')} style={{ flex: 1, backgroundColor: selectedPaymentMethod === 'bank' ? '#005eb8' : '#f0f0f0', padding: 12, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
-                <Building color={selectedPaymentMethod === 'bank' ? '#fff' : '#666'} size={18} style={{ marginRight: 8 }} />
-                <Text color={selectedPaymentMethod === 'bank' ? '#fff' : '#666'} fontWeight="bold">US Bank</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setSelectedPaymentMethod('crypto')} style={{ flex: 1, backgroundColor: selectedPaymentMethod === 'crypto' ? '#005eb8' : '#f0f0f0', padding: 12, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
-                <Wallet color={selectedPaymentMethod === 'crypto' ? '#fff' : '#666'} size={18} style={{ marginRight: 8 }} />
-                <Text color={selectedPaymentMethod === 'crypto' ? '#fff' : '#666'} fontWeight="bold">Crypto</Text>
-              </TouchableOpacity>
+            <XStack space="$2" marginBottom="$4" padding={4} backgroundColor="#f8fafc" borderRadius={TOKENS.RADIUS.MD}>
+              <Pressable onPress={() => setSelectedPaymentMethod('bank')} style={{ flex: 1 }}>
+                <View style={{ backgroundColor: selectedPaymentMethod === 'bank' ? 'transparent' : 'transparent', padding: 12, borderRadius: TOKENS.RADIUS.SM, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', overflow: 'hidden', ...(selectedPaymentMethod === 'bank' ? TOKENS.SHADOWS.COLORED(TOKENS.COLORS.BRAND) : {}) }}>
+                  {selectedPaymentMethod === 'bank' && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />}
+                  <Building color={selectedPaymentMethod === 'bank' ? '#fff' : TOKENS.COLORS.TEXT_SECONDARY} size={18} style={{ marginRight: 8 }} />
+                  <Text color={selectedPaymentMethod === 'bank' ? '#fff' : TOKENS.COLORS.TEXT_SECONDARY} fontWeight="bold">US Bank</Text>
+                </View>
+              </Pressable>
+              <Pressable onPress={() => setSelectedPaymentMethod('crypto')} style={{ flex: 1 }}>
+                <View style={{ backgroundColor: selectedPaymentMethod === 'crypto' ? 'transparent' : 'transparent', padding: 12, borderRadius: TOKENS.RADIUS.SM, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', overflow: 'hidden', ...(selectedPaymentMethod === 'crypto' ? TOKENS.SHADOWS.COLORED(TOKENS.COLORS.BRAND) : {}) }}>
+                  {selectedPaymentMethod === 'crypto' && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />}
+                  <Wallet color={selectedPaymentMethod === 'crypto' ? '#fff' : TOKENS.COLORS.TEXT_SECONDARY} size={18} style={{ marginRight: 8 }} />
+                  <Text color={selectedPaymentMethod === 'crypto' ? '#fff' : TOKENS.COLORS.TEXT_SECONDARY} fontWeight="bold">Crypto</Text>
+                </View>
+              </Pressable>
             </XStack>
 
             {selectedPaymentMethod === 'bank' ? (
-              <View style={{ backgroundColor: '#f9f9f9', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#eee' }}>
-                <Text color="#999" fontSize="$2" marginBottom="$2">TRANSFER DETAILS (ACH/WIRE)</Text>
+              <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.SUBTLE }}>
+                <LinearGradient colors={['#ffffff', '#f8fafc']} style={StyleSheet.absoluteFillObject} />
+                <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="700" fontSize="$2" marginBottom="$4" letterSpacing={0.5}>TRANSFER DETAILS (ACH/WIRE)</Text>
                 
-                <YStack space="$3">
+                <YStack space="$4">
                   <View>
-                    <Text color="#666" fontSize="$3">Bank Name</Text>
-                    <Text fontWeight="bold" fontSize="$4">{bankDetails?.bankName || 'N/A'}</Text>
+                    <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize="$3" marginBottom={4}>Bank Name</Text>
+                    <Text fontWeight="700" fontSize="$4" color={TOKENS.COLORS.TEXT_PRIMARY}>{bankDetails?.bankName || 'N/A'}</Text>
                   </View>
+                  <View style={{ height: 1, backgroundColor: '#f1f5f9' }} />
                   <View>
-                    <Text color="#666" fontSize="$3">Account Holder</Text>
-                    <Text fontWeight="bold" fontSize="$4">{bankDetails?.accountHolder || 'N/A'}</Text>
+                    <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize="$3" marginBottom={4}>Account Holder</Text>
+                    <Text fontWeight="700" fontSize="$4" color={TOKENS.COLORS.TEXT_PRIMARY}>{bankDetails?.accountHolder || 'N/A'}</Text>
                   </View>
+                  <View style={{ height: 1, backgroundColor: '#f1f5f9' }} />
                   <View>
-                    <Text color="#666" fontSize="$3">Routing Number</Text>
+                    <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize="$3" marginBottom={4}>Routing Number</Text>
                     <XStack justifyContent="space-between" alignItems="center">
-                      <Text fontWeight="bold" fontSize="$4" color="#005eb8">{bankDetails?.routingNumber || 'N/A'}</Text>
-                      <TouchableOpacity onPress={() => { Clipboard.setString(bankDetails?.routingNumber || ''); alert("Copied"); }}><Copy color="#999" size={16} /></TouchableOpacity>
+                      <Text fontWeight="700" fontSize="$5" color={TOKENS.COLORS.BRAND}>{bankDetails?.routingNumber || 'N/A'}</Text>
+                      <ScaleButton onPress={() => { Clipboard.setString(bankDetails?.routingNumber || ''); Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setCopiedRouting(true); setTimeout(() => setCopiedRouting(false), 1500); }} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' }}>
+                        {copiedRouting ? <CheckCircle2 color={TOKENS.COLORS.SUCCESS} size={16} /> : <Copy color={TOKENS.COLORS.BRAND} size={16} />}
+                      </ScaleButton>
                     </XStack>
                   </View>
+                  <View style={{ height: 1, backgroundColor: '#f1f5f9' }} />
                   <View>
-                    <Text color="#666" fontSize="$3">Account Number</Text>
+                    <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize="$3" marginBottom={4}>Account Number</Text>
                     <XStack justifyContent="space-between" alignItems="center">
-                      <Text fontWeight="bold" fontSize="$4" color="#005eb8">{bankDetails?.accountNumber || 'N/A'}</Text>
-                      <TouchableOpacity onPress={() => { Clipboard.setString(bankDetails?.accountNumber || ''); alert("Copied"); }}><Copy color="#999" size={16} /></TouchableOpacity>
+                      <Text fontWeight="700" fontSize="$5" color={TOKENS.COLORS.BRAND}>{bankDetails?.accountNumber || 'N/A'}</Text>
+                      <ScaleButton onPress={() => { Clipboard.setString(bankDetails?.accountNumber || ''); Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setCopiedAccount(true); setTimeout(() => setCopiedAccount(false), 1500); }} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' }}>
+                        {copiedAccount ? <CheckCircle2 color={TOKENS.COLORS.SUCCESS} size={16} /> : <Copy color={TOKENS.COLORS.BRAND} size={16} />}
+                      </ScaleButton>
                     </XStack>
                   </View>
                 </YStack>
               </View>
             ) : (
-              <View style={{ backgroundColor: '#f9f9f9', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#eee', alignItems: 'center' }}>
-                <Text color="#999" fontSize="$2" marginBottom="$4">{cryptoDetails?.network || 'N/A'} WALLET ADDRESS</Text>
+              <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: '#f1f5f9', alignItems: 'center', ...TOKENS.SHADOWS.SUBTLE }}>
+                <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="700" fontSize="$2" marginBottom="$4" letterSpacing={0.5}>{cryptoDetails?.network?.toUpperCase() || 'N/A'} WALLET ADDRESS</Text>
                 
-                <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#eee' }}>
+                <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 20, borderWidth: 2, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.ELEVATED }}>
                   <ImageBackground 
                     source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(cryptoDetails?.walletAddress || '')}` }}
-                    style={{ width: 100, height: 100 }}
+                    style={{ width: 120, height: 120 }}
                   />
                 </View>
                 
-                <View style={{ backgroundColor: '#e6f2ff', padding: 12, borderRadius: 8, width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text color="#005eb8" fontWeight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 8 }}>{cryptoDetails?.walletAddress || 'N/A'}</Text>
-                  <TouchableOpacity><Copy color="#005eb8" size={20} /></TouchableOpacity>
+                <View style={{ backgroundColor: '#fff', padding: 12, paddingLeft: 16, borderRadius: TOKENS.RADIUS.MD, width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderLeftWidth: 4, borderLeftColor: TOKENS.COLORS.BRAND, ...TOKENS.SHADOWS.SUBTLE, marginBottom: 12 }}>
+                  <Text color={TOKENS.COLORS.TEXT_PRIMARY} fontWeight="600" numberOfLines={1} style={{ flex: 1, marginRight: 8 }}>{cryptoDetails?.walletAddress || 'N/A'}</Text>
+                  <ScaleButton onPress={() => { Clipboard.setString(cryptoDetails?.walletAddress || ''); Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setCopiedCrypto(true); setTimeout(() => setCopiedCrypto(false), 1500); }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' }}>
+                    {copiedCrypto ? <CheckCircle2 color={TOKENS.COLORS.SUCCESS} size={18} /> : <Copy color={TOKENS.COLORS.BRAND} size={18} />}
+                  </ScaleButton>
                 </View>
-                <Text color="#666" fontSize="$2" marginTop="$2" textAlign="center">Send only via {cryptoDetails?.network || 'N/A'} network to this address.</Text>
+                <XStack space="$2" alignItems="center">
+                  <AlertCircle color={TOKENS.COLORS.WARNING} size={14} />
+                  <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize="$2" textAlign="center">Send only via {cryptoDetails?.network || 'N/A'} network to this address.</Text>
+                </XStack>
               </View>
             )}
 
-            <TouchableOpacity onPress={async () => { 
-                Platform.OS !== 'web' && Haptics.notificationAsync(); 
+            <ScaleButton disabled={isPaid} onPress={async () => { 
+                Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); 
+                setIsPaid(true);
                 if (activePaymentMsg) {
                   try {
                     await api.request(`/chat/messages/${activePaymentMsg.id}/mark-paid`, { method: 'POST' });
@@ -603,130 +727,189 @@ export default function ChatThreadScreen() {
                     console.error('Failed to mark as paid', e);
                   }
                 }
-                setPaymentModalVisible(false); 
-              }} style={{ backgroundColor: '#333', padding: 16, borderRadius: 12, marginTop: 20, alignItems: 'center' }}>
-              <Text color="white" fontWeight="bold">Mark as Paid</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+                setTimeout(() => { setPaymentModalVisible(false); setIsPaid(false); }, 600); 
+              }} style={{ width: '100%', overflow: 'hidden', padding: 16, borderRadius: TOKENS.RADIUS.MD, marginTop: 24, alignItems: 'center', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.SUCCESS) }}>
+              <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+              <Animated.View style={{ flexDirection: 'row', alignItems: 'center', transform: [{ scale: isPaid ? 1.1 : 1 }] }}>
+                <CheckCircle2 color="#fff" size={20} style={{ marginRight: 8 }} />
+                <Text color="white" fontWeight="bold" fontSize="$4">{isPaid ? 'Paid ✓' : 'Mark as Paid'}</Text>
+              </Animated.View>
+            </ScaleButton>
+          </Animated.View>
+        </Animated.View>
       </Modal>
 
       {/* Input Area */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {replyingTo && (
-          <Animated.View entering={FadeInUp.duration(200)} style={{ backgroundColor: '#f9f9f9', padding: 12, borderTopWidth: 1, borderTopColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ borderLeftWidth: 4, borderLeftColor: '#005eb8', paddingLeft: 8 }}>
-              <Text color="#005eb8" fontWeight="bold" fontSize="$3">Replying to {replyingTo.isSender ? 'Yourself' : recipient?.name || 'Contact'}</Text>
-              <Text color="#666" fontSize="$3" numberOfLines={1}>{replyingTo.text || 'Media Message'}</Text>
+          <Animated.View entering={FadeInUp.duration(200)} style={{ borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+            <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+            <View style={{ padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
+                <View style={{ width: 4, height: '100%', minHeight: 32, backgroundColor: '#6366f1', borderRadius: 4, marginRight: 10 }} />
+                <View flex={1}>
+                  <Text color="#4f46e5" fontWeight="800" fontSize="$2" marginBottom={2}>Replying to {replyingTo.isSender ? 'Yourself' : recipient?.name || 'Contact'}</Text>
+                  <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize="$3" numberOfLines={1}>{replyingTo.text || 'Media Message'}</Text>
+                </View>
+              </View>
+              <ScaleButton onPress={() => setReplyingTo(null)} style={{ padding: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: TOKENS.RADIUS.MD, marginLeft: 8 }}>
+                <X color={TOKENS.COLORS.TEXT_SECONDARY} size={18} />
+              </ScaleButton>
             </View>
-            <TouchableOpacity onPress={() => setReplyingTo(null)}>
-              <X color="#999" size={20} />
-            </TouchableOpacity>
           </Animated.View>
         )}
         {showScheduleOptions && (
-          <Animated.View entering={FadeInDown} style={{ backgroundColor: '#fff', padding: 16, borderTopWidth: 1, borderTopColor: '#eee' }}>
-            <Text fontWeight="bold" marginBottom={8}>Attachments</Text>
+          <Animated.View entering={FadeInDown.springify().damping(20)} style={{ backgroundColor: '#fff', padding: 16, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingBottom: Platform.OS === 'ios' ? 24 : 16 }}>
+            <Text fontWeight="800" marginBottom={16} color={TOKENS.COLORS.TEXT_PRIMARY} fontSize={16}>Attachments</Text>
             <XStack space="$4" justifyContent="space-around" marginTop="$2">
-              <TouchableOpacity onPress={() => { setMoneyRequestMode(true); setShowScheduleOptions(false); }} style={{ alignItems: 'center' }}>
-                <View style={{ padding: 16, backgroundColor: 'rgba(39, 174, 96, 0.1)', borderRadius: 24, marginBottom: 8 }}>
-                  <Banknote color="#27ae60" size={28} />
-                </View>
-                <Text fontSize={12} color="#666">Money</Text>
-              </TouchableOpacity>
+              <ScaleButton onPress={() => { setMoneyRequestMode(true); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
+                <Animated.View entering={FadeInDown.delay(0).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.SUCCESS) }}>
+                  <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                  <Banknote color="#fff" size={26} />
+                </Animated.View>
+                <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">Money</Text>
+              </ScaleButton>
               
-              <TouchableOpacity onPress={() => { pickDocument(); setShowScheduleOptions(false); }} style={{ alignItems: 'center' }}>
-                <View style={{ padding: 16, backgroundColor: 'rgba(155, 89, 182, 0.1)', borderRadius: 24, marginBottom: 8 }}>
-                  <Paperclip color="#8e44ad" size={28} />
-                </View>
-                <Text fontSize={12} color="#666">File</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { pickImage(); setShowScheduleOptions(false); }} style={{ alignItems: 'center' }}>
-                <View style={{ padding: 16, backgroundColor: 'rgba(230, 126, 34, 0.1)', borderRadius: 24, marginBottom: 8 }}>
-                  <ImageIcon color="#d35400" size={28} />
-                </View>
-                <Text fontSize={12} color="#666">Gallery</Text>
-              </TouchableOpacity>
+              <ScaleButton onPress={() => { pickDocument(); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
+                <Animated.View entering={FadeInDown.delay(40).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.BRAND) }}>
+                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                  <Paperclip color="#fff" size={26} />
+                </Animated.View>
+                <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">File</Text>
+              </ScaleButton>
+              
+              <ScaleButton onPress={() => { pickImage(); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
+                <Animated.View entering={FadeInDown.delay(80).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.WARNING) }}>
+                  <LinearGradient colors={TOKENS.GRADIENTS.GOLD} style={StyleSheet.absoluteFillObject} />
+                  <ImageIcon color="#fff" size={26} />
+                </Animated.View>
+                <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">Gallery</Text>
+              </ScaleButton>
                 
-                <TouchableOpacity onPress={() => { setShowTaskModal(true); setShowScheduleOptions(false); }} style={{ alignItems: 'center' }}>
-                  <View style={{ padding: 16, backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 24, marginBottom: 8 }}>
-                    <CheckSquare color="#3b82f6" size={28} />
-                  </View>
-                  <Text fontSize={12} color="#666">To-Do</Text>
-                </TouchableOpacity>
+              <ScaleButton onPress={() => { setShowTaskModal(true); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
+                <Animated.View entering={FadeInDown.delay(120).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED('#8b5cf6') }}>
+                  <LinearGradient colors={TOKENS.GRADIENTS.AI} style={StyleSheet.absoluteFillObject} />
+                  <ListChecks color="#fff" size={26} />
+                </Animated.View>
+                <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">To-Do</Text>
+              </ScaleButton>
             </XStack>
           </Animated.View>
         )}
         
         {/* Quick Replies Menu */}
         {inputText.startsWith('/') && (
-          <Animated.View entering={FadeInDown} style={{ backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee', maxHeight: 200 }}>
+          <Animated.View entering={FadeInDown} style={{ backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f1f5f9', maxHeight: 240, ...TOKENS.SHADOWS.SUBTLE }}>
             <ScrollView keyboardShouldPersistTaps="always">
               {quickReplies.filter((r: string) => r.toLowerCase().includes(inputText.slice(1).toLowerCase())).map((reply: string, i: number) => (
-                <TouchableOpacity key={i} onPress={() => { setInputText(reply); Platform.OS !== 'web' && Haptics.selectionAsync(); }} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', flexDirection: 'row', alignItems: 'center' }}>
-                  <Zap color="#f39c12" size={16} style={{ marginRight: 8 }} />
-                  <Text>{reply}</Text>
-                </TouchableOpacity>
+                <ScaleButton key={i} onPress={() => { setInputText(reply); Platform.OS !== 'web' && Haptics.selectionAsync(); }} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f8fafc', flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ width: 32, height: 32, borderRadius: TOKENS.RADIUS.MD, overflow: 'hidden', backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <LinearGradient colors={TOKENS.GRADIENTS.GOLD} style={StyleSheet.absoluteFillObject} />
+                    <Zap color="#d97706" size={16} />
+                  </View>
+                  <Text color={TOKENS.COLORS.TEXT_PRIMARY} fontWeight="500" fontSize={15}>{reply}</Text>
+                </ScaleButton>
               ))}
               {inputText.length > 1 && !quickReplies.includes(inputText.slice(1)) && (
-                <TouchableOpacity onPress={() => { addQuickReply(inputText.slice(1)); setInputText(inputText.slice(1)); Platform.OS !== 'web' && Haptics.notificationAsync(); }} style={{ padding: 16, backgroundColor: '#f0f8ff', flexDirection: 'row', alignItems: 'center' }}>
-                  <Text color="#005eb8" fontWeight="bold">+ Save "{inputText.slice(1)}" as new Quick Reply</Text>
-                </TouchableOpacity>
+                <ScaleButton onPress={() => { addQuickReply(inputText.slice(1)); setInputText(inputText.slice(1)); Platform.OS !== 'web' && Haptics.notificationAsync(); }} style={{ padding: 16, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', backgroundColor: '#eff6ff' }}>
+                  <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
+                  <View style={{ width: 32, height: 32, borderRadius: TOKENS.RADIUS.MD, backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <PlusCircle color="#fff" size={16} />
+                  </View>
+                  <Text color="#2563eb" fontWeight="800" fontSize={15}>Save "{inputText.slice(1)}" as new Quick Reply</Text>
+                </ScaleButton>
               )}
             </ScrollView>
           </Animated.View>
         )}
         {moneyRequestMode && (
-          <Animated.View entering={FadeInDown} style={{ backgroundColor: '#f0f8ff', padding: 16, borderTopWidth: 1, borderTopColor: '#cce0ff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text fontWeight="bold" color="#005eb8">Request Amount (৳):</Text>
-            <XStack space="$2" alignItems="center" flex={1} marginLeft="$3">
-              <TextInput value={moneyAmount} onChangeText={setMoneyAmount} keyboardType="numeric" placeholder="0.00" style={{ flex: 1, backgroundColor: '#fff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#005eb8', fontSize: 16 }} />
-              <TouchableOpacity onPress={sendMoneyRequest} style={{ backgroundColor: '#005eb8', padding: 10, borderRadius: 8 }}>
-                <Send color="#fff" size={18} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setMoneyRequestMode(false)}>
-                <X color="#666" size={24} />
-              </TouchableOpacity>
+          <Animated.View entering={FadeInUp.duration(200)} style={{ borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', overflow: 'hidden', ...TOKENS.SHADOWS.SUBTLE }}>
+            <LinearGradient colors={['#ecfdf5', '#f0fdf4']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+            <XStack padding={12} alignItems="center" space="$2">
+              <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#34d399', ...TOKENS.SHADOWS.SUBTLE }}>
+                <Text color={TOKENS.COLORS.SUCCESS} fontWeight="bold" fontSize={16} marginRight={4}>$</Text>
+                <TextInput 
+                  value={moneyAmount}
+                  onChangeText={setMoneyAmount}
+                  placeholder="0.00"
+                  keyboardType="numeric"
+                  autoFocus
+                  style={{ fontSize: 16, color: TOKENS.COLORS.TEXT_PRIMARY, flex: 1, fontWeight: '600' }}
+                />
+              </View>
+              <ScaleButton onPress={() => { 
+                  if(moneyAmount) { 
+                    sendMoneyRequest(); 
+                    Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); 
+                  }
+                }} 
+                style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.MD, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', opacity: moneyAmount ? 1 : 0.5, ...(moneyAmount ? TOKENS.SHADOWS.COLORED(TOKENS.COLORS.SUCCESS) : {}) }}
+              >
+                <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                <Send color="white" size={18} style={{ transform: [{ translateX: -1 }] }} />
+              </ScaleButton>
+              <ScaleButton style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#d1fae5', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMoneyRequestMode(false)}>
+                <X color={TOKENS.COLORS.SUCCESS} size={20} />
+              </ScaleButton>
             </XStack>
           </Animated.View>
         )}
         {/* Toolbar & Input Box */}
-        <XStack padding="$3" paddingBottom="$5" backgroundColor="#fff" alignItems="flex-end" space="$2" shadowColor="#000" shadowOpacity={0.05} shadowRadius={10} elevation={10}>
-          <TouchableOpacity onPress={() => setShowScheduleOptions(!showScheduleOptions)}>
-            <View style={{ padding: 10, borderRadius: 24, justifyContent: 'center', alignItems: 'center', backgroundColor: showScheduleOptions ? 'rgba(0,0,0,0.05)' : 'transparent' }}>
-              <PlusCircle color="#888" size={28} />
+        <XStack padding="$3" paddingBottom={Platform.OS === 'ios' ? "$5" : "$3"} backgroundColor="rgba(255,255,255,0.95)" alignItems="flex-end" space="$2" borderTopWidth={1} borderTopColor="rgba(0,0,0,0.03)" shadowColor="#0f172a" shadowOpacity={0.05} shadowRadius={8} shadowOffset={{width: 0, height: -2}} elevation={10}>
+          <ScaleButton onPress={() => { setShowScheduleOptions(!showScheduleOptions); Platform.OS !== 'web' && Haptics.selectionAsync(); }}>
+            <View style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, justifyContent: 'center', alignItems: 'center', backgroundColor: showScheduleOptions ? '#e2e8f0' : '#f1f5f9', transform: [{ rotate: showScheduleOptions ? '45deg' : '0deg' }] }}>
+              <PlusCircle color={showScheduleOptions ? "#475569" : "#64748b"} size={26} strokeWidth={2.5} />
             </View>
-          </TouchableOpacity>
+          </ScaleButton>
           
-          <View style={{ flex: 1, backgroundColor: '#f4f7fb', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 8, minHeight: 44, maxHeight: 120, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e1e8f0' }}>
+          <View style={{ flex: 1, backgroundColor: inputText.trim() ? '#fff' : '#f8fafc', borderRadius: TOKENS.RADIUS.LG, paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 10 : 8, minHeight: 44, maxHeight: 120, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: inputText.trim() ? '#6366f1' : '#e2e8f0', shadowColor: inputText.trim() ? '#6366f1' : 'transparent', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
             <TextInput
               multiline
               value={inputText}
               onChangeText={setInputText}
-                onFocus={() => setIsEmojiPickerOpen(false)}
+              onFocus={() => setIsEmojiPickerOpen(false)}
               placeholder="Message..."
-              placeholderTextColor="#999"
-              style={{ fontSize: 16, color: '#333', flex: 1, maxHeight: 100 }}
+              placeholderTextColor="#94a3b8"
+              style={{ fontSize: 16, color: '#0f172a', flex: 1, maxHeight: 100 }}
             />
-            <TouchableOpacity onPress={() => { Keyboard.dismiss(); setIsEmojiPickerOpen(true); }} style={{ marginLeft: 8 }}>
-              <Smile color={isEmojiPickerOpen ? "#005eb8" : "#aaa"} size={24} />
-            </TouchableOpacity>
+            <ScaleButton onPress={() => { Keyboard.dismiss(); setIsEmojiPickerOpen(true); }} style={{ marginLeft: 8, padding: 4 }}>
+              <Smile color={isEmojiPickerOpen ? "#6366f1" : "#94a3b8"} size={24} />
+            </ScaleButton>
           </View>
           
-          <TouchableOpacity 
+          <AnimatedPressable 
             onPress={() => inputText.trim() ? handleSendMessage() : null}
-            onPressIn={() => !inputText.trim() ? startRecording() : null}
-            onPressOut={() => !inputText.trim() ? stopRecording() : null}
+            onPressIn={() => {
+              if (!inputText.trim()) {
+                startRecording();
+                Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(()=>{});
+              }
+            }}
+            onPressOut={() => {
+              if (!inputText.trim()) {
+                stopRecording();
+                Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+              }
+            }}
           >
-            <Animated.View entering={FadeInUp} style={{ padding: 14, backgroundColor: inputText.trim() ? '#007aff' : isRecording ? '#ef4444' : '#f1f5f9', borderRadius: 25, transform: [{ scale: isRecording ? 1.25 : 1 }], shadowColor: inputText.trim() ? '#007aff' : isRecording ? '#ef4444' : 'transparent', shadowOpacity: 0.4, shadowRadius: 10, elevation: (inputText.trim() || isRecording) ? 5 : 0 }}>
+            <Animated.View style={{ padding: 12, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', backgroundColor: (!inputText.trim() && !isRecording) ? '#e0e7ff' : inputText.trim() ? '#6366f1' : '#ef4444', transform: [{ scale: isRecording ? 1.3 : 1 }], shadowColor: inputText.trim() ? '#4f46e5' : isRecording ? '#ef4444' : 'transparent', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: (inputText.trim() || isRecording) ? 5 : 0 }}>
               {inputText.trim() ? (
-                <Send color="white" size={20} />
+                <>
+                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                  <Send color="white" size={20} style={{ transform: [{ translateX: 2 }, { translateY: -1 }] }} />
+                </>
               ) : (
-                <Mic color="#888" size={20} />
+                <>
+                  {isRecording && <LinearGradient colors={TOKENS.GRADIENTS.DANGER} style={StyleSheet.absoluteFillObject} />}
+                  <Mic color={isRecording ? "#fff" : "#6366f1"} size={22} />
+                  {isRecording && (
+                    <Animated.View style={{ position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, borderRadius: TOKENS.RADIUS.XL, borderWidth: 2, borderColor: '#ef4444', opacity: 0.4 }} />
+                  )}
+                </>
               )}
             </Animated.View>
-            </TouchableOpacity>
-          </XStack>
+          </AnimatedPressable>
+        </XStack>
       </KeyboardAvoidingView>
       <EmojiPicker 
           open={isEmojiPickerOpen} 
@@ -736,65 +919,97 @@ export default function ChatThreadScreen() {
         />
       
       {/* Task Creator Modal */}
-      <Modal visible={showTaskModal} transparent animationType="slide">
+      <Modal visible={showTaskModal} transparent animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-            <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' }}>
+          <Animated.View entering={FadeInDown.duration(200)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+            <Animated.View entering={FadeInDown.springify().damping(15).delay(100)} style={{ backgroundColor: '#fff', borderTopLeftRadius: TOKENS.RADIUS.XL, borderTopRightRadius: TOKENS.RADIUS.XL, padding: 20, maxHeight: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 }}>
+              
+              {/* Drag Handle */}
+              <View style={{ width: 40, height: 4, backgroundColor: '#cbd5e1', borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
+              
               <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-                <Text fontSize={20} fontWeight="bold">Create To-Do List</Text>
-                <TouchableOpacity onPress={() => setShowTaskModal(false)}>
-                  <Text color="#666" fontSize={24}>X</Text>
-                </TouchableOpacity>
+                <XStack alignItems="center" space="$2">
+                  <View style={{ width: 32, height: 32, borderRadius: 16, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
+                    <LinearGradient colors={TOKENS.GRADIENTS.AI} style={StyleSheet.absoluteFillObject} />
+                    <ListChecks color="#fff" size={16} />
+                  </View>
+                  <Text fontWeight="800" fontSize="$6" color={TOKENS.COLORS.TEXT_PRIMARY}>Create To-Do List</Text>
+                </XStack>
+                <ScaleButton onPress={() => setShowTaskModal(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' }}>
+                  <X color={TOKENS.COLORS.TEXT_SECONDARY} size={18} />
+                </ScaleButton>
               </XStack>
               
               <TextInput 
                 value={taskTitle}
                 onChangeText={setTaskTitle}
                 placeholder="List Title (e.g. Website Features)"
-                style={{ backgroundColor: '#f5f5f5', padding: 12, borderRadius: 12, marginBottom: 16, fontWeight: 'bold' }}
+                placeholderTextColor={TOKENS.COLORS.TEXT_SECONDARY}
+                style={{ backgroundColor: '#f8fafc', padding: 16, borderRadius: TOKENS.RADIUS.MD, marginBottom: 16, fontWeight: '700', fontSize: 16, color: TOKENS.COLORS.TEXT_PRIMARY, borderWidth: 1, borderColor: taskTitle ? TOKENS.COLORS.BRAND : '#e2e8f0', ...TOKENS.SHADOWS.SUBTLE }}
               />
               
-              <ScrollView style={{ maxHeight: 300 }}>
+              <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={false}>
                 {taskInputs.map((t, i) => (
-                  <XStack key={i} alignItems="center" marginBottom="$3">
-                    <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#ccc', marginRight: 12 }} />
-                    <TextInput 
-                      value={typeof t === 'string' ? t : t.title}
-                      onChangeText={(val) => {
-                        const newInputs = [...taskInputs];
-                        newInputs[i] = typeof t === 'string' ? { title: val, price: '' } : { ...t, title: val };
-                        if (i === taskInputs.length - 1 && val !== '') {
-                          newInputs.push('');
-                        }
-                        setTaskInputs(newInputs);
-                      }}
-                      placeholder="Add a task..."
-                      style={{ flex: 1, borderBottomWidth: 1, borderBottomColor: '#eee', paddingVertical: 8 }}
-                    />
-                    <TextInput 
-                      value={typeof t === 'string' ? '' : t.price}
-                      onChangeText={(val) => {
-                        const newInputs = [...taskInputs];
-                        if (typeof t === 'string') {
-                            newInputs[i] = { title: t, price: val };
-                        } else {
-                            newInputs[i] = { ...t, price: val };
-                        }
-                        setTaskInputs(newInputs);
-                      }}
-                      placeholder="$0.00"
-                      keyboardType="numeric"
-                      style={{ width: 60, marginLeft: 10, backgroundColor: '#f0f4f8', padding: 8, borderRadius: 8, textAlign: 'center' }}
-                    />
-                  </XStack>
+                  <Animated.View key={i} entering={FadeInDown.springify()} style={{ backgroundColor: '#fff', borderRadius: TOKENS.RADIUS.MD, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.SUBTLE }}>
+                    <XStack alignItems="center">
+                      <View style={{ width: 24, height: 24, borderRadius: TOKENS.RADIUS.SM, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0', marginRight: 12, justifyContent: 'center', alignItems: 'center' }}>
+                        <Text fontSize={12} fontWeight="800" color={TOKENS.COLORS.TEXT_SECONDARY}>{i + 1}</Text>
+                      </View>
+                      <TextInput 
+                        value={typeof t === 'string' ? t : t.title}
+                        onChangeText={(val) => {
+                          const newInputs = [...taskInputs];
+                          newInputs[i] = typeof t === 'string' ? { title: val, price: '' } : { ...t, title: val };
+                          if (i === taskInputs.length - 1 && val !== '') {
+                            newInputs.push('');
+                          }
+                          setTaskInputs(newInputs);
+                        }}
+                        placeholder="Add a task..."
+                        placeholderTextColor={TOKENS.COLORS.TEXT_SECONDARY}
+                        style={{ flex: 1, paddingVertical: 8, fontSize: 15, color: TOKENS.COLORS.TEXT_PRIMARY, fontWeight: '500' }}
+                      />
+                      <View style={{ width: 80, marginLeft: 10, backgroundColor: '#f8fafc', borderRadius: TOKENS.RADIUS.SM, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, borderWidth: 1, borderColor: (typeof t !== 'string' && t.price) ? TOKENS.COLORS.BRAND : '#e2e8f0' }}>
+                        <DollarSign color={TOKENS.COLORS.TEXT_SECONDARY} size={14} />
+                        <TextInput 
+                          value={typeof t === 'string' ? '' : t.price}
+                          onChangeText={(val) => {
+                            const newInputs = [...taskInputs];
+                            if (typeof t === 'string') {
+                                newInputs[i] = { title: t, price: val };
+                            } else {
+                                newInputs[i] = { ...t, price: val };
+                            }
+                            setTaskInputs(newInputs);
+                          }}
+                          placeholder="0.00"
+                          placeholderTextColor={TOKENS.COLORS.TEXT_SECONDARY}
+                          keyboardType="numeric"
+                          style={{ flex: 1, paddingVertical: 8, fontSize: 14, color: TOKENS.COLORS.TEXT_PRIMARY, fontWeight: '600' }}
+                        />
+                      </View>
+                    </XStack>
+                  </Animated.View>
                 ))}
               </ScrollView>
               
-              <TouchableOpacity onPress={sendTaskList} style={{ backgroundColor: '#005eb8', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 16 }}>
-                <Text color="#fff" fontWeight="bold">Send List</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+              <ScaleButton 
+                onPress={() => {
+                  if (taskTitle.trim() && taskInputs.some(t => typeof t === 'string' ? t.trim() : t.title.trim())) {
+                    sendTaskList();
+                    Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                }} 
+                style={{ width: '100%', overflow: 'hidden', padding: 16, borderRadius: TOKENS.RADIUS.MD, marginTop: 16, alignItems: 'center', opacity: (taskTitle.trim() && taskInputs.some(t => typeof t === 'string' ? t.trim() : t.title.trim())) ? 1 : 0.5, ...((taskTitle.trim() && taskInputs.some(t => typeof t === 'string' ? t.trim() : t.title.trim())) ? TOKENS.SHADOWS.COLORED(TOKENS.COLORS.BRAND) : {}) }}
+              >
+                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                <XStack space="$2" alignItems="center">
+                  <Send color="#fff" size={18} />
+                  <Text color="white" fontWeight="bold" fontSize="$4">Send List</Text>
+                </XStack>
+              </ScaleButton>
+            </Animated.View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
 

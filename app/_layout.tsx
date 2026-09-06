@@ -18,6 +18,7 @@ import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { setupCallKeep } from '../src/services/CallKeepService';
 import { CallProvider } from '../src/context/CallContext'
 import { ChatProvider } from '../src/context/ChatContext'
+import { ThemeProvider, useThemeContext } from '../src/context/ThemeContext'
 import IncomingCallModal from '../src/components/IncomingCallModal'
 
 function RootLayoutNav() {
@@ -60,6 +61,8 @@ function RootLayoutNav() {
 
 
 import React from 'react';
+import { TOKENS } from '../src/theme/tokens';
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -84,20 +87,14 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  useEffect(() => {
-    setupCallKeep();
-  }, []);
+
+function InnerApp() {
+  const { isDark } = useThemeContext();
   const isWeb = Platform.OS === 'web';
-  
   return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <ErrorBoundary>
     <TamaguiProvider config={tamaguiConfig}>
-      {/* Dynamic Theme */}
-        <Theme name={colorScheme === 'dark' ? 'dark' : 'light'}>
-        <View flex={1} backgroundColor={isWeb ? '#f0f0f0' : 'transparent'} alignItems={isWeb ? 'center' : 'stretch'} justifyContent={isWeb ? 'center' : 'flex-start'}>
+      <Theme name={isDark ? 'dark' : 'light'}>
+        <View flex={1} backgroundColor={isWeb ? (isDark ? '#0f172a' : '#f0f0f0') : 'transparent'} alignItems={isWeb ? 'center' : 'stretch'} justifyContent={isWeb ? 'center' : 'flex-start'}>
           <View 
             flex={1} 
             width="100%" 
@@ -108,21 +105,35 @@ export default function RootLayout() {
             shadowColor="#000"
             shadowOpacity={isWeb ? 0.1 : 0}
             shadowRadius={20}
-            style={isWeb ? { marginVertical: 20, borderRadius: 30, borderWidth: 8, borderColor: '#333', borderStyle: 'solid' } : {}}
+            style={isWeb ? { marginVertical: 20, borderRadius: TOKENS.RADIUS.XL, borderWidth: 8, borderColor: isDark ? '#1e293b' : '#333', borderStyle: 'solid' } : {}}
           >
             <AuthProvider>
               <CallProvider>
                 <ChatProvider>
-              <RootLayoutNav />
-              <IncomingCallModal />
-            </ChatProvider>
+                  <RootLayoutNav />
+                  <IncomingCallModal />
+                </ChatProvider>
               </CallProvider>
             </AuthProvider>
           </View>
         </View>
       </Theme>
     </TamaguiProvider>
-    </ErrorBoundary>
+  );
+}
+
+export default function RootLayout() {
+  useEffect(() => {
+    setupCallKeep();
+  }, []);
+  
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <InnerApp />
+        </ThemeProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   )
 }

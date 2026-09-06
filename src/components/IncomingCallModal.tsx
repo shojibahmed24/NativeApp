@@ -4,6 +4,8 @@ import { YStack, XStack, Text, Avatar } from 'tamagui';
 import { Phone, PhoneOff, Video } from 'lucide-react-native';
 import { useCall } from '../context/CallContext';
 import { useRouter } from 'expo-router';
+import { TOKENS } from '../theme/tokens';
+
 
 export default function IncomingCallModal() {
   const { incomingCall, acceptIncomingCall, rejectIncomingCall } = useCall();
@@ -43,7 +45,7 @@ export default function IncomingCallModal() {
 
           {incomingCall.isTranslated && (
             <View style={styles.aiBadge}>
-              <Text color="#059669" fontSize={12} fontWeight="bold">AI Translated Call</Text>
+              <Text color={TOKENS.COLORS.SUCCESS} fontSize={12} fontWeight="bold">AI Translated Call</Text>
             </View>
           )}
 
@@ -71,9 +73,11 @@ const styles = StyleSheet.create({
   },
   modal: {
     width: Dimensions.get('window').width * 0.85,
+    backgroundColor: '#1e293b',
+    elevation: 8,
     alignItems: 'center',
     padding: 30,
-    borderRadius: 20
+    borderRadius: TOKENS.RADIUS.LG
   },
   btn: {
     width: 70,
@@ -96,7 +100,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16,185,129,0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: TOKENS.RADIUS.LG,
     marginBottom: 20
   }
 });
