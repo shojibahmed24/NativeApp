@@ -1,17 +1,21 @@
-import { Platform, useColorScheme, Text, View as RNView, Text as RNText } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import 'react-native-get-random-values';
+import { Platform, useColorScheme, Text, View as RNView, Text as RNText, useWindowDimensions } from 'react-native';
+import React, { useEffect } from 'react';
 if (Platform.OS === 'web') {
   require('./global.css');
 }
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TamaguiProvider, Theme, YStack, Spinner, View } from 'tamagui'
 import { Stack, useRouter, useSegments } from 'expo-router'
-// // import * as Sentry from "@sentry/react-native";
+import * as Sentry from "@sentry/react-native";
 
-// // Sentry.init({
-// //   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || "https://dummy-dsn@o0.ingest.sentry.io/0",
-// //   tracesSampleRate: 1.0,
-// // });
-import { useEffect } from 'react'
+if (process.env.EXPO_PUBLIC_SENTRY_DSN && process.env.EXPO_PUBLIC_SENTRY_DSN.startsWith('http')) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    tracesSampleRate: 1.0,
+  });
+}
 
 import tamaguiConfig from '../tamagui.config'
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
@@ -22,7 +26,7 @@ import { ThemeProvider, useThemeContext } from '../src/context/ThemeContext'
 import IncomingCallModal from '../src/components/IncomingCallModal'
 
 function RootLayoutNav() {
-  const { user, loading } = useAuth();
+  const { user, loading, hasSeenOnboarding } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -30,13 +34,18 @@ function RootLayoutNav() {
     if (loading) return;
     
     const inAuthGroup = segments[0] === '(auth)';
+    const publicRoutes = ['terms', 'privacy', 'support'];
+    const isPublicRoute = publicRoutes.includes(segments[0]);
     
-    if (!user && !inAuthGroup) {
+    if (!user && !inAuthGroup && !isPublicRoute) {
       // Redirect to login if not authenticated
       router.replace('/(auth)/login');
     } else if (user && (inAuthGroup || segments.length === 0)) {
-      // Redirect to main tabs if authenticated and on auth or root
-      router.replace('/(main)/messages'); 
+      if (!hasSeenOnboarding && segments[0] !== 'onboarding') {
+        router.replace('/onboarding');
+      } else if (hasSeenOnboarding) {
+        router.replace('/(main)/messages');
+      }
     }
   }, [user, loading, segments]);
 
@@ -51,16 +60,19 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="(main)" options={{ headerShown: false }} />
       <Stack.Screen name="dialpadModal" options={{ presentation: 'modal', headerShown: false }} />
       <Stack.Screen name="call/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="support" options={{ headerShown: false }} />
+      <Stack.Screen name="privacy" options={{ headerShown: false }} />
+      <Stack.Screen name="terms" options={{ headerShown: false }} />
     </Stack>
   );
 }
 
 
-import React from 'react';
 import { TOKENS } from '../src/theme/tokens';
 
 class ErrorBoundary extends React.Component {
@@ -73,6 +85,7 @@ class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error, errorInfo) {
     console.error("Uncaught error:", error, errorInfo);
+    Sentry.captureException(error);
   }
   render() {
     if (this.state.hasError) {
@@ -90,22 +103,36 @@ class ErrorBoundary extends React.Component {
 
 function InnerApp() {
   const { isDark } = useThemeContext();
-  const isWeb = Platform.OS === 'web';
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && windowWidth > 600;
   return (
     <TamaguiProvider config={tamaguiConfig}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
       <Theme name={isDark ? 'dark' : 'light'}>
-        <View flex={1} backgroundColor={isWeb ? (isDark ? '#0f172a' : '#f0f0f0') : 'transparent'} alignItems={isWeb ? 'center' : 'stretch'} justifyContent={isWeb ? 'center' : 'flex-start'}>
+        <View 
+          flex={1} 
+          backgroundColor={isDesktopWeb ? (isDark ? '#0f172a' : '#f0f0f0') : (isDark ? '#0f172a' : '$background')} 
+          alignItems={isDesktopWeb ? 'center' : 'stretch'} 
+          justifyContent={isDesktopWeb ? 'center' : 'flex-start'}
+        >
           <View 
             flex={1} 
             width="100%" 
-            maxWidth={isWeb ? 420 : '100%'} 
-            maxHeight={isWeb ? 850 : '100%'}
+            maxWidth={isDesktopWeb ? 420 : '100%'} 
+            maxHeight={isDesktopWeb ? Math.min(850, windowHeight - 40) : '100%'}
             backgroundColor="$background"
             overflow="hidden"
             shadowColor="#000"
-            shadowOpacity={isWeb ? 0.1 : 0}
+            shadowOpacity={isDesktopWeb ? 0.15 : 0}
             shadowRadius={20}
-            style={isWeb ? { marginVertical: 20, borderRadius: TOKENS.RADIUS.XL, borderWidth: 8, borderColor: isDark ? '#1e293b' : '#333', borderStyle: 'solid' } : {}}
+            style={isDesktopWeb ? { 
+              marginVertical: 20, 
+              borderRadius: TOKENS.RADIUS.XL, 
+              borderWidth: 8, 
+              borderColor: isDark ? '#1e293b' : '#333', 
+              borderStyle: 'solid',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+            } : {}}
           >
             <AuthProvider>
               <CallProvider>
@@ -122,7 +149,7 @@ function InnerApp() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   useEffect(() => {
     setupCallKeep();
   }, []);
@@ -137,3 +164,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   )
 }
+
+export default Sentry.wrap(RootLayout);

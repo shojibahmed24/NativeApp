@@ -1,8 +1,11 @@
 
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+const isExpoGo = Constants.appOwnership === 'expo';
 
 let CallKeep = null;
-if (Platform.OS !== 'web') {
+if (Platform.OS !== 'web' && !isExpoGo) {
   try {
     CallKeep = require('react-native-callkeep').default;
   } catch (e) {
@@ -11,7 +14,7 @@ if (Platform.OS !== 'web') {
 }
 
 export const setupCallKeep = () => {
-  if (!CallKeep) return;
+  if (!CallKeep || !CallKeep.setup) return;
   const options = {
     ios: {
       appName: 'UNICOM',
@@ -35,18 +38,22 @@ export const setupCallKeep = () => {
 
   try {
     CallKeep.setup(options).then(accepted => {});
-    CallKeep.setAvailable(true);
+    if (CallKeep.setAvailable) CallKeep.setAvailable(true);
   } catch (err) {
-    console.error('CallKeep setup error:', err);
+    console.log('CallKeep setup skipped:', err.message);
   }
 };
 
 export const displayIncomingCall = (uuid, handle, localizedCallerName) => {
-  if (!CallKeep) return;
-  CallKeep.displayIncomingCall(uuid, handle, localizedCallerName, 'number', false);
+  if (!CallKeep || !CallKeep.displayIncomingCall) return;
+  try {
+    CallKeep.displayIncomingCall(uuid, handle, localizedCallerName, 'number', false);
+  } catch (e) {}
 };
 
 export const endCall = (uuid) => {
-  if (!CallKeep) return;
-  CallKeep.endCall(uuid);
+  if (!CallKeep || !CallKeep.endCall) return;
+  try {
+    CallKeep.endCall(uuid);
+  } catch (e) {}
 };

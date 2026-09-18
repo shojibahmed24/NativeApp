@@ -1,9 +1,11 @@
+import { TOKENS } from '../../src/theme/tokens';
+import { useThemeContext } from '../../src/context/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TextInput, TouchableOpacity, Text as RNText, StyleSheet, RefreshControl, Dimensions, Alert, Platform, KeyboardAvoidingView, ScrollView, Modal, Pressable } from 'react-native';
-import { YStack, XStack, Avatar } from 'tamagui';
+import { View, TextInput, TouchableOpacity, Text as RNText, StyleSheet, RefreshControl, Dimensions, Alert, Platform, KeyboardAvoidingView, ScrollView, Modal, Pressable, Image, Animated as RNAnimated } from 'react-native';
+import { YStack, XStack } from 'tamagui';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, Search, Sparkles, XCircle, Trash2, Grid3x3, X, FileText } from 'lucide-react-native';
-import Animated, { FadeInRight, FadeOutRight, FadeInUp, SlideInDown, SlideOutDown, useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, interpolate, Extrapolate, runOnJS, withSequence, Easing } from 'react-native-reanimated';
+import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, Search, Sparkles, XCircle, Trash2, ArrowLeft, MessageSquare, ArrowUpRight, ArrowDownLeft, X, FileText } from 'lucide-react-native';
+import Animated, { FadeInRight, FadeInDown, FadeOutRight, FadeInUp, SlideInRight, SlideInDown, SlideOutDown, useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, interpolate, Extrapolate, runOnJS, withSequence, Easing } from 'react-native-reanimated';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
@@ -12,24 +14,20 @@ import { api } from '../../src/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'react-native';
-import { TOKENS } from '../../src/theme/tokens';
-
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
-
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // Color palette for contact avatars
 const AVATAR_PALETTE = [
-  { bg: '#3b82f6', ring: '#93c5fd' }, // Blue
-  { bg: '#8b5cf6', ring: '#c4b5fd' }, // Purple
-  { bg: '#0d9488', ring: '#5eead4' }, // Teal
-  { bg: '#f43f5e', ring: '#fda4af' }, // Rose / Coral
-  { bg: '#f59e0b', ring: '#fcd34d' }, // Amber
-  { bg: '#0284c7', ring: '#7dd3fc' }, // Sky
-  { bg: '#6366f1', ring: '#a5b4fc' }, // Indigo
-  { bg: '#10b981', ring: '#6ee7b7' }, // Emerald
+  { bg: '#3b82f6', ring: '#93c5fd' },
+  { bg: '#8b5cf6', ring: '#c4b5fd' },
+  { bg: '#0d9488', ring: '#5eead4' },
+  { bg: '#f43f5e', ring: '#fda4af' },
+  { bg: '#f59e0b', ring: '#fcd34d' },
+  { bg: '#0284c7', ring: '#7dd3fc' },
+  { bg: '#6366f1', ring: '#a5b4fc' },
+  { bg: '#10b981', ring: '#6ee7b7' },
 ];
 
 const getAvatarTheme = (name: string) => {
@@ -41,71 +39,144 @@ const getAvatarTheme = (name: string) => {
   return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 };
 
-// --- Small Components for Polish ---
-
-const PulseBadge = ({ count }: { count: number }) => {
-  const pulseScale = useSharedValue(1);
-  const pulseOpacity = useSharedValue(1);
-
+// --- Animated Avatar Ring ---
+const AnimatedAvatarRing = ({ children, callType }: { children: React.ReactNode, callType: 'missed' | 'incoming' | 'outgoing' }) => {
+  const ringRotation = useSharedValue(0);
+  
   useEffect(() => {
-    if (count > 0) {
-      pulseScale.value = withRepeat(withTiming(1.3, { duration: 1000 }), -1, true);
-      pulseOpacity.value = withRepeat(withTiming(0.4, { duration: 1000 }), -1, true);
-    } else {
-      pulseScale.value = 1;
-      pulseOpacity.value = 1;
-    }
-  }, [count]);
+    ringRotation.value = withRepeat(
+      withTiming(360, { duration: callType === 'missed' ? 3000 : 6000, easing: Easing.linear }),
+      -1, false
+    );
+  }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
-    opacity: pulseOpacity.value,
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${ringRotation.value}deg` }]
   }));
 
-  if (count === 0) return null;
+  const ringColors = callType === 'missed' 
+    ? ['#ef4444', '#f97316', '#ef4444'] 
+    : callType === 'incoming' 
+      ? ['#06d6a0', '#38bdf8', '#06d6a0'] 
+      : ['#8b5cf6', '#c084fc', '#8b5cf6']; 
 
   return (
-    <View style={styles.missedBadgeContainer}>
-      <Animated.View style={[styles.missedBadgeGlow, animatedStyle]} />
-      <View style={styles.missedBadge}>
-        <RNText style={styles.missedBadgeText}>{count}</RNText>
+    <View style={{ width: 64, height: 64, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={[{ position: 'absolute', width: 64, height: 64, borderRadius: 32 }, ringStyle]}>
+        <LinearGradient
+          colors={ringColors as [string, string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ width: 64, height: 64, borderRadius: 32 }}
+        />
+      </Animated.View>
+      <View style={{ width: 58, height: 58, borderRadius: 29, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 54, height: 54, borderRadius: 27, overflow: 'hidden' }}>
+          {children}
+        </View>
       </View>
     </View>
   );
 };
 
+const FilterButton = ({ label, type, activeFilter, onSelect, gradientColors }: any) => {
+  const { isDark } = useThemeContext();
+  const isActive = activeFilter === type;
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.92, { damping: 15 });
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+    }
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15 });
+  };
+
+  const inactiveBorder = isDark ? 'rgba(255,255,255,0.12)' : '#e2e8f0';
+  const inactiveBg = isDark ? '#1e293b' : '#ffffff';
+  const inactiveText = isDark ? '#94a3b8' : '#475569';
+
+  return (
+    <AnimatedPressable
+      onPress={() => onSelect(type)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={[
+        {
+          borderRadius: 20,
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          borderWidth: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          overflow: 'hidden',
+          borderColor: isActive ? gradientColors[0] : inactiveBorder,
+          backgroundColor: isActive ? 'transparent' : inactiveBg,
+        },
+        isActive && {
+          shadowColor: gradientColors[0],
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.5,
+          shadowRadius: 10,
+          elevation: 8,
+        },
+        animatedStyle
+      ]}
+    >
+      {isActive && (
+        <LinearGradient
+          colors={gradientColors}
+          start={{x:0,y:0}} end={{x:1,y:1}}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
+      <RNText style={{
+        fontSize: 14,
+        fontWeight: isActive ? '700' : '600',
+        color: isActive ? '#ffffff' : inactiveText,
+        zIndex: 2,
+        letterSpacing: 0.3,
+      }}>
+        {label}
+      </RNText>
+    </AnimatedPressable>
+  );
+};
+
 const LoadingSkeleton = () => {
   const shimmerOpacity = useSharedValue(0.4);
-  
   useEffect(() => {
     shimmerOpacity.value = withRepeat(
       withTiming(0.8, { duration: 800, easing: Easing.inOut(Easing.ease) }), 
-      -1, 
-      true
+      -1, true
     );
   }, []);
-
   const animatedStyle = useAnimatedStyle(() => ({ opacity: shimmerOpacity.value }));
-
   return (
     <YStack paddingHorizontal="$4" paddingTop="$4" space="$4">
-      {[1, 2, 3, 4, 5, 6].map(i => (
-        <Animated.View key={i} style={[animatedStyle, { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }]}>
-          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#cbd5e1' }} />
-          <YStack flex={1} marginLeft="$3" space="$2">
-            <View style={{ width: 140, height: 16, borderRadius: TOKENS.RADIUS.SM, backgroundColor: '#cbd5e1' }} />
-            <View style={{ width: 90, height: 12, borderRadius: 6, backgroundColor: '#e2e8f0' }} />
+      {[1, 2, 3, 4].map(i => (
+        <Animated.View key={i} style={[animatedStyle, { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 24, padding: 16, marginBottom: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' }]} >
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(226,232,240,0.5)' }} />
+          <YStack flex={1} marginLeft="$4" space="$2">
+            <View style={{ width: 140, height: 18, borderRadius: 6, backgroundColor: 'rgba(226,232,240,0.5)' }} />
+            <View style={{ width: 90, height: 14, borderRadius: 6, backgroundColor: 'rgba(241,245,249,0.5)' }} />
           </YStack>
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e2e8f0' }} />
         </Animated.View>
       ))}
     </YStack>
   );
 };
 
-// --- Main Screen ---
-
 export default function CallsScreen() {
+  const { isDark } = useThemeContext();
+  const styles = getStyles(isDark);
   const { user } = useAuth();
   const { startVoiceCall } = useCall();
   const router = useRouter();
@@ -117,53 +188,33 @@ export default function CallsScreen() {
   
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const [missedCount, setMissedCount] = useState(0);
-  const [selectedSummary, setSelectedSummary] = useState<any>(null);
+  const [contextMenu, setContextMenu] = useState<{ log: any; x: number; y: number } | null>(null);
 
-  // FAB Animation
-  const fabGlowRotate = useSharedValue(0);
-  const fabScale = useSharedValue(1);
+  const p1Y = useSharedValue(0);
+  const p2Y = useSharedValue(0);
+  const p3Y = useSharedValue(0);
+  const p4Y = useSharedValue(0);
+  const p5Y = useSharedValue(0);
 
   useEffect(() => {
     fetchCallLogs();
     checkMissedCalls();
     
-    // Start FAB glow rotation
-    fabGlowRotate.value = withRepeat(
-      withTiming(360, { duration: 8000, easing: Easing.linear }),
-      -1,
-      false
-    );
+    p1Y.value = withRepeat(withTiming(-20, { duration: 4000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p2Y.value = withRepeat(withTiming(25, { duration: 5000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p3Y.value = withRepeat(withTiming(-30, { duration: 6000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p4Y.value = withRepeat(withTiming(15, { duration: 4500, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p5Y.value = withRepeat(withTiming(-25, { duration: 5500, easing: Easing.inOut(Easing.ease) }), -1, true);
   }, []);
 
-  const fabGlowStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${fabGlowRotate.value}deg` }]
-  }));
-
-  const fabAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabScale.value }]
-  }));
-
-  const handleFabPressIn = () => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(()=>{});
-    fabScale.value = withSpring(0.9);
-  };
-  const handleFabPressOut = () => {
-    fabScale.value = withSpring(1);
-    router.push('/(main)/contacts'); // Assuming contacts acts as dialpad/new call
-  };
-
-  const toggleSearch = () => {
-    if (!isSearching) {
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
-      setIsSearching(true);
-    } else {
-      setIsSearching(false);
-      setSearchQuery('');
-    }
-  };
+  const p1Style = useAnimatedStyle(() => ({ transform: [{ translateY: p1Y.value }] }));
+  const p2Style = useAnimatedStyle(() => ({ transform: [{ translateY: p2Y.value }] }));
+  const p3Style = useAnimatedStyle(() => ({ transform: [{ translateY: p3Y.value }] }));
+  const p4Style = useAnimatedStyle(() => ({ transform: [{ translateY: p4Y.value }] }));
+  const p5Style = useAnimatedStyle(() => ({ transform: [{ translateY: p5Y.value }] }));
 
   const fetchCallLogs = async () => {
     try {
@@ -227,30 +278,23 @@ export default function CallsScreen() {
       await api.deleteCallLog(callId);
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Could not delete call log");
-      fetchCallLogs(); // restore on fail
+      fetchCallLogs();
     }
   };
 
   const renderRightActions = (progress: any, dragX: any, callId: string) => {
-    const scale = dragX.interpolate({
-      inputRange: [-80, -40, 0],
-      outputRange: [1, 0.5, 0],
-      extrapolate: 'clamp',
-    });
-    
     return (
-      <View style={styles.deleteActionContainer}>
+      <LinearGradient colors={['#ef4444', '#dc2626']} start={{x:0,y:0}} end={{x:1,y:0}} style={styles.deleteActionContainer}>
         <TouchableOpacity style={styles.deleteAction} onPress={() => handleDeleteCall(callId)}>
-          <Animated.View style={{ transform: [{ scale }] }}>
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <Trash2 color="#fff" size={24} />
-          </Animated.View>
+            <RNText style={{ color: '#fff', fontSize: 11, marginTop: 4, fontWeight: '600' }}>Delete</RNText>
+          </View>
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
     );
   };
 
-  // Filtering
   const filteredLogs = (logs || []).filter(log => {
     const isMissed = log.status === 'missed' && !log.isOutgoing;
     const isIncoming = !log.isOutgoing && log.status !== 'missed';
@@ -269,832 +313,420 @@ export default function CallsScreen() {
     return true;
   });
 
-  const renderRow = (log: any, index: number, totalInGroup: number) => {
+  const renderRow = (log: any, index: number) => {
     const isMissed = log.status === 'missed' && !log.isOutgoing;
     const isIncoming = !log.isOutgoing && log.status !== 'missed';
-    
-    const date = new Date(log.createdAt);
-    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isOutgoing = log.isOutgoing;
 
-    let Icon = PhoneOutgoing;
-    let iconColor = "#0284c7";
-    let iconBg = "#e0f2fe";
+    const peerName = log.peer?.name || log.peer?.phone || 'Unknown Caller';
+    const initial = peerName.charAt(0).toUpperCase();
+    const avatarTheme = getAvatarTheme(peerName);
+    const hasCustomAvatar = Boolean(log.peer?.avatar);
+
+    const callDate = new Date(log.createdAt);
+    const timeString = callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let iconColor = '#10b981'; 
+    let directionText = 'Incoming';
+    let DirectionIcon = ArrowUpRight;
+
     if (isMissed) {
-      Icon = PhoneMissed;
-      iconColor = "#ef4444";
-      iconBg = "#fee2e2";
-    } else if (isIncoming) {
-      Icon = PhoneIncoming;
-      iconColor = "#10b981";
-      iconBg = "#d1fae5";
+      iconColor = '#ef4444';
+      directionText = 'Missed';
+      DirectionIcon = ArrowDownLeft;
+    } else if (isOutgoing) {
+      iconColor = '#3b82f6';
+      directionText = 'Outgoing';
+      DirectionIcon = ArrowUpRight;
     }
 
-    const peerName = log.peer?.name || log.peer?.phone || "Unknown";
-    const initial = peerName.trim().charAt(0).toUpperCase() || 'U';
-    const avatarTheme = getAvatarTheme(peerName);
-    const hasCustomAvatar = !!log.peer?.avatar && !log.peer.avatar.includes('ui-avatars.com');
-
-    const isFirst = index === 0;
-    const isLast = index === totalInGroup - 1;
-
     return (
-      <View style={[
-        styles.logRowWrapper, 
-        isFirst && styles.rowFirst,
-        isLast && styles.rowLast,
-        isMissed && styles.logRowMissed
-      ]}>
-        <TouchableOpacity 
-          style={{ flex: 1 }} 
-          activeOpacity={0.7} 
-          onPress={() => {
-            const peerId = log.peer?.id || log.peer?.phone;
-            if (peerId) {
-              router.push(`/profile/${peerId}`);
-            }
-          }}
-        >
-          <XStack flex={1} alignItems="center" space="$3">
-            {/* Avatar with initial or real photo */}
-            <View style={styles.avatarWrapper}>
-              {hasCustomAvatar ? (
-                <Image 
-                  source={{ uri: log.peer.avatar }} 
-                  style={[styles.avatarImage, { borderColor: avatarTheme.ring }]} 
-                />
-              ) : (
-                <View style={[styles.avatarFallback, { backgroundColor: avatarTheme.bg, borderColor: avatarTheme.ring }]}>
-                  <RNText style={styles.avatarInitial}>{initial}</RNText>
-                </View>
-              )}
-            </View>
-            
-            <YStack flex={1}>
-              <XStack alignItems="center" space="$2">
-                <RNText style={[styles.peerName, isMissed && styles.peerNameMissed]} numberOfLines={1}>
-                  {peerName}
-                </RNText>
-                {log.aiSummary && (
-                  <View style={styles.aiBadge}>
-                    <LinearGradient 
-                      colors={TOKENS.GRADIENTS.SUCCESS} 
-                      start={{x:0,y:0}} 
-                      end={{x:1,y:1}} 
-                      style={StyleSheet.absoluteFillObject} 
-                    />
-                    <Sparkles size={10} color="#ffffff" style={{ marginRight: 3 }} />
-                    <RNText style={styles.aiBadgeText}>AI</RNText>
-                  </View>
-                )}
-              </XStack>
-              <XStack alignItems="center" marginTop={3}>
-                <Icon size={14} color={iconColor} strokeWidth={2.5} style={{ marginRight: 6 }} />
-                <RNText style={styles.timeText}>{timeStr}</RNText>
-                {log.durationSeconds > 0 && (
-                  <RNText style={styles.durationText}>
-                    {'  •  '}{Math.floor(log.durationSeconds / 60)}m {log.durationSeconds % 60}s
-                  </RNText>
-                )}
-              </XStack>
-            </YStack>
-          </XStack>
-        </TouchableOpacity>
-
-        <XStack space="$2.5" alignItems="center">
-          {log.aiSummary && (
-            <TouchableOpacity 
-              style={styles.actionBtnShadowAi}
-              onPress={() => setSelectedSummary(log)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient 
-                colors={TOKENS.GRADIENTS.SUCCESS} 
-                start={{x:0,y:0}} 
-                end={{x:1,y:1}} 
-                style={styles.actionBtn}
-              >
-                <Sparkles size={16} color="#fff" />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-          
+      <Animated.View key={log.id} entering={SlideInRight.delay(index * 60).springify().damping(15)} style={[styles.cardContainer, isMissed && styles.cardContainerMissed]}>
+        {/* Glassmorphic Gradient Background — theme-adaptive */}
+        <LinearGradient 
+          colors={isDark ? ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)'] : ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']} 
+          start={{x:0, y:0}} end={{x:0, y:1}} style={StyleSheet.absoluteFillObject} />
+        
+        <Swipeable renderRightActions={(p, d) => renderRightActions(p, d, log.id)} rightThreshold={40} friction={2}>
           <TouchableOpacity 
-            style={styles.subtleActionBtn}
-            onPress={async () => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
-              if (log.peer) {
-                try {
-                  const res = await startVoiceCall(log.peer, log.type === 'video');
-                  if (res && res.call && res.call.id) {
-                    router.push(`/call/${res.call.id}`);
-                  }
-                } catch (error) {
-                  Alert.alert("Call Failed", "Could not start the call");
-                }
+            style={styles.logRowWrapper} 
+            activeOpacity={0.8}
+            onLongPress={(e) => {
+              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(()=>{});
+              setContextMenu({ log, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+            }}
+            onPress={() => {
+              if (log.peer?.id) {
+                router.push(`/profile/${log.peer.id}`);
               }
             }}
-            activeOpacity={0.6}
-            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
           >
-            {log.type === 'video' ? <Video size={20} color="#005eb8" strokeWidth={2} /> : <Phone size={20} color="#005eb8" strokeWidth={2} />}
+            <XStack flex={1} alignItems="center">
+              <AnimatedAvatarRing callType={isMissed ? 'missed' : isIncoming ? 'incoming' : 'outgoing'}>
+                {hasCustomAvatar ? (
+                  <Image source={{ uri: log.peer.avatar }} style={{ width: 54, height: 54, borderRadius: 27 }} />
+                ) : (
+                  <View style={[styles.avatarFallback, { backgroundColor: avatarTheme.bg }]}>
+                    <RNText style={styles.avatarInitial}>{initial}</RNText>
+                  </View>
+                )}
+              </AnimatedAvatarRing>
+              
+              <YStack flex={1} marginLeft="$4" justifyContent="center">
+                <RNText style={[styles.peerName, isMissed && { color: '#ef4444' }]} numberOfLines={1}>{peerName}</RNText>
+                <XStack alignItems="center" marginTop={4} space="$1.5">
+                  <DirectionIcon size={14} color={iconColor} strokeWidth={3} />
+                  <RNText style={[styles.directionText, { color: iconColor }]}>{directionText}</RNText>
+                </XStack>
+              </YStack>
+
+              <YStack alignItems="flex-end" justifyContent="space-between" height={54}>
+                <RNText style={styles.timeText}>{timeString}</RNText>
+                <TouchableOpacity 
+                  style={styles.callBackBtn}
+                  onPress={async (e) => {
+                    e.stopPropagation();
+                    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+                    if (log.peer) {
+                      try {
+                        const res = await startVoiceCall(log.peer, false);
+                        if (res?.call?.id) router.push(`/call/${res.call.id}`);
+                      } catch(err) {}
+                    }
+                  }}
+                >
+                  <RNText style={styles.callBackText}>Call back</RNText>
+                </TouchableOpacity>
+              </YStack>
+            </XStack>
           </TouchableOpacity>
-        </XStack>
-      </View>
+        </Swipeable>
+      </Animated.View>
     );
   };
 
   return (
     <View style={styles.container}>
-      {/* Background Gradient - richer presence at top fading to clean soft surface */}
+      {/* === FULL-SCREEN THEME-ADAPTIVE GRADIENT (Option A — Clean) === */}
       <LinearGradient
-        colors={TOKENS.GRADIENTS.SCREEN_BG}
-        locations={[0, 0.28, 0.7]}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
+        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
+        locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
       />
-      
-      {/* Decorative Blur Blobs */}
-      <View style={[styles.blob, styles.blob1]} />
-      <View style={[styles.blob, styles.blob2]} />
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) }]}>
-        {!isSearching ? (
-          <Animated.View entering={FadeInRight} exiting={FadeOutRight} style={styles.headerContent}>
-            <XStack alignItems="center" space="$2.5">
-              <View style={styles.logoCircle}>
-                <Image source={require('../../assets/images/logo-icon-transparent.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
-              </View>
-              <RNText style={styles.appTitle}>UniCom</RNText>
-            </XStack>
-            <TouchableOpacity style={styles.searchBtnShadow} onPress={toggleSearch} activeOpacity={0.85}>
-              <LinearGradient 
-                colors={TOKENS.GRADIENTS.PRIMARY} 
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.searchBtn}
-              >
-                <Search color="#ffffff" size={19} strokeWidth={2.2} />
+      {/* Top Fixed Section (Search + Filters) */}
+      <View style={{ paddingTop: insets.top + 10, zIndex: 10, paddingBottom: 10 }}>
+        {/* Search Bar */}
+        <XStack paddingHorizontal="$4" marginBottom="$4">
+          <View style={[styles.searchContainer, { 
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+            borderColor: isSearchFocused ? (isDark ? '#38bdf8' : '#0ea5e9') : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'),
+            borderWidth: 1.5,
+            shadowColor: isSearchFocused ? (isDark ? '#38bdf8' : '#0ea5e9') : (isDark ? '#000' : '#64748b'),
+            shadowOffset: { width: 0, height: isSearchFocused ? 6 : 4 },
+            shadowOpacity: isSearchFocused ? (isDark ? 0.3 : 0.2) : (isDark ? 0 : 0.1),
+            shadowRadius: isSearchFocused ? 16 : 12,
+            elevation: isDark ? 0 : 4,
+          }]}>
+            <Image source={require('../../assets/images/logo-icon-transparent.png')} style={{ width: 28, height: 28, marginLeft: 16 }} />
+            <TextInput
+              style={[styles.searchInput, { color: isDark ? '#fff' : '#1e293b' }, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
+              placeholder="Search calls..."
+              placeholderTextColor={isDark ? "#94a3b8" : "#64748b"}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={{ marginRight: 6 }}>
+              <LinearGradient colors={['#38bdf8', '#818cf8']} style={styles.searchIconBtn}>
+                {searchQuery.length > 0 ? <X color="#fff" size={18} /> : <Search color="#fff" size={18} />}
               </LinearGradient>
             </TouchableOpacity>
-          </Animated.View>
-        ) : (
-          <Animated.View entering={FadeInRight} exiting={FadeOutRight} style={[styles.headerContent, { width: '100%' }]}>
-            <View style={styles.searchBar}>
-              <Search color={TOKENS.COLORS.TEXT_SECONDARY} size={18} />
-              <TextInput 
-                style={styles.searchInput}
-                placeholder="Search names or numbers..."
-                placeholderTextColor="#94a3b8"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoFocus
-              />
-              {searchQuery ? (
-                <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <XCircle color={TOKENS.COLORS.TEXT_SECONDARY} size={18} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <TouchableOpacity onPress={toggleSearch} style={{ marginLeft: 12 }}>
-              <RNText style={styles.cancelText}>Cancel</RNText>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </View>
+          </View>
+        </XStack>
 
-      {/* Filter Pills */}
-      <View style={styles.filterWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContainer}>
-          {['all', 'missed', 'incoming', 'outgoing'].map((f) => {
-            const isActive = filter === f;
-            const isMissedFilter = f === 'missed';
-            return (
-              <TouchableOpacity 
-                key={f} 
-                activeOpacity={0.85}
-                onPress={() => handleFilterChange(f)} 
-                style={[
-                  styles.filterPill, 
-                  isActive ? (isMissedFilter ? styles.filterPillActiveMissed : styles.filterPillActive) : styles.filterPillInactive
-                ]}
-              >
-                {isActive && (
-                  <LinearGradient
-                    colors={isMissedFilter ? ['#ef4444', '#f43f5e'] : ['#005eb8', '#6366f1']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[StyleSheet.absoluteFillObject, { borderRadius: TOKENS.RADIUS.LG }]}
-                  />
-                )}
-                <RNText style={[styles.filterText, isActive && styles.filterTextActive, !isActive && isMissedFilter && missedCount > 0 && { color: '#ef4444' }]}>
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </RNText>
-                {isMissedFilter && <PulseBadge count={missedCount} />}
-              </TouchableOpacity>
-            );
-          })}
+        {/* Filter Pills */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+          <FilterButton label="All" type="all" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#0ea5e9', '#3b82f6']} />
+          <FilterButton label="Missed" type="missed" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#f43f5e', '#ec4899']} />
+          <FilterButton label="Incoming" type="incoming" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#10b981', '#14b8a6']} />
+          <FilterButton label="Outgoing" type="outgoing" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#8b5cf6', '#6366f1']} />
         </ScrollView>
       </View>
 
-      {/* Call Log Scroll View */}
-      <ScrollView 
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: Math.max((insets?.bottom || 0) + 120, 140) }
-        ]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#005eb8" />}
-      >
-        {loading ? (
-          <LoadingSkeleton />
-        ) : filteredLogs.length === 0 ? (
-          <Animated.View entering={FadeInUp.duration(600).delay(200)}>
-            <YStack alignItems="center" justifyContent="center" marginTop="$10" space="$4">
-              <View style={styles.emptyIconContainer}>
-                <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
-                <PhoneMissed color="#6366f1" size={34} strokeWidth={2} />
-              </View>
-              <YStack alignItems="center" space="$1">
-                <RNText style={styles.emptyTitle}>No calls found</RNText>
-                <RNText style={styles.emptySub}>Your call history will appear here</RNText>
-              </YStack>
-            </YStack>
-          </Animated.View>
-        ) : (
-          (() => {
-            const groups: { [key: string]: any[] } = { Today: [], Yesterday: [], 'This Week': [], 'Older': [] };
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-            const thisWeek = new Date(today); thisWeek.setDate(thisWeek.getDate() - 7);
-            
-            filteredLogs.forEach(log => {
-              const d = new Date(log.createdAt);
-              if (d >= today) groups.Today.push(log);
-              else if (d >= yesterday) groups.Yesterday.push(log);
-              else if (d >= thisWeek) groups['This Week'].push(log);
-              else groups.Older.push(log);
-            });
-
-            return Object.entries(groups).filter(([_, items]) => items.length > 0).map(([groupName, groupLogs], groupIndex) => (
-              <View key={groupName} style={styles.groupCardWrapper}>
-                {/* Group Header Label */}
-                <XStack alignItems="center" marginBottom={12} marginLeft={4}>
-                  <View style={styles.sectionDot} />
-                  <RNText style={styles.sectionTitle}>{groupName}</RNText>
-                </XStack>
-                
-                {/* Group Card with real soft drop shadow */}
-                <View style={styles.cardContainer}>
-                  {groupLogs.map((log: any, index: number) => (
-                    <Animated.View key={log.id} entering={FadeInUp.delay((groupIndex * 10 + index) * 35).springify()}>
-                      {Platform.OS === 'web' ? (
-                        renderRow(log, index, groupLogs.length)
-                      ) : (
-                        <Swipeable renderRightActions={(prog, drag) => renderRightActions(prog, drag, log.id)}>
-                          {renderRow(log, index, groupLogs.length)}
-                        </Swipeable>
-                      )}
-                    </Animated.View>
-                  ))}
-                </View>
-              </View>
-            ));
-          })()
-        )}
-      </ScrollView>
-
-      {/* FAB */}
-      <View style={[styles.fabContainer, { bottom: Math.max((insets?.bottom || 0) + 115, 125) }]}>
-        <Animated.View style={[styles.fabGlow, fabGlowStyle]} />
-        <AnimatedPressable 
-          style={fabAnimatedStyle}
-          onPressIn={handleFabPressIn}
-          onPressOut={handleFabPressOut}
-        >
-          <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={styles.fab} start={{x:0, y:0}} end={{x:1, y:1}}>
-            <Grid3x3 color="#fff" size={24} strokeWidth={2.3} />
-          </LinearGradient>
-        </AnimatedPressable>
+      {/* Background Particles below header, rendered behind ScrollView */}
+      <View style={[StyleSheet.absoluteFillObject, { zIndex: 1, pointerEvents: 'none' }]}>
+        <Animated.View style={[styles.particle, { backgroundColor: '#8b5cf6', top: 380, left: 20, width: 8, height: 8 }, p1Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#06b6d4', top: 580, right: 30, width: 12, height: 12 }, p2Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#ec4899', top: 780, left: 40, width: 6, height: 6 }, p3Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#3b82f6', top: 480, right: 60, width: 9, height: 9 }, p4Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#a855f7', top: 680, left: 80, width: 10, height: 10 }, p5Style]} />
       </View>
 
-      {/* AI Summary Bottom Sheet Modal */}
-      <Modal visible={!!selectedSummary} transparent animationType="fade" onRequestClose={() => setSelectedSummary(null)}>
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => setSelectedSummary(null)} activeOpacity={1} />
-          <Animated.View entering={SlideInDown.springify().damping(15)} exiting={SlideOutDown} style={[styles.bottomSheet, { paddingBottom: Math.max((insets?.bottom || 0) + 20, 24) }]}>
-            
-            <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} locations={[0, 0.35]} style={[StyleSheet.absoluteFillObject, { borderTopLeftRadius: TOKENS.RADIUS.XL, borderTopRightRadius: TOKENS.RADIUS.XL }]} />
-            
-            <View style={styles.sheetHandle} />
-            <XStack justifyContent="space-between" alignItems="center" marginBottom="$4" paddingHorizontal="$4" zIndex={2}>
-              <XStack space="$3" alignItems="center">
-                <View style={styles.sheetSparkleBadge}>
-                  <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-                  <Sparkles color="#fff" size={20} />
-                </View>
-                <YStack>
-                  <RNText style={styles.sheetTitle}>AI Call Summary</RNText>
-                  <RNText style={styles.sheetSubtitle}>Call with {selectedSummary?.peer?.name || 'Contact'}</RNText>
-                </YStack>
-              </XStack>
-              <TouchableOpacity onPress={() => setSelectedSummary(null)} style={styles.sheetCloseIconBtn}>
-                <X color={TOKENS.COLORS.TEXT_SECONDARY} size={20} strokeWidth={2.5} />
-              </TouchableOpacity>
-            </XStack>
-            
-            <ScrollView style={{ maxHeight: SCREEN_HEIGHT * 0.45, paddingHorizontal: 16 }} showsVerticalScrollIndicator={false}>
-              {selectedSummary?.aiSummary ? (
-                <View style={styles.summaryBox}>
-                  <RNText style={styles.summaryText}>{selectedSummary.aiSummary}</RNText>
-                </View>
-              ) : (
-                <YStack alignItems="center" paddingVertical="$6" space="$3">
-                  <FileText color="#cbd5e1" size={44} style={{ marginBottom: 8 }} />
-                  <RNText style={styles.emptySub}>No AI Summary was generated for this call.</RNText>
-                </YStack>
-              )}
-            </ScrollView>
-            
-            <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setSelectedSummary(null)}>
-              <RNText style={styles.sheetCloseBtnText}>Done</RNText>
+      {/* Main Content (Cards scroll over the dark header) */}
+      {loading ? (
+        <LoadingSkeleton />
+      ) : filteredLogs.length === 0 ? (
+        <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" opacity={0.8} zIndex={5}>
+          <Phone color={isDark ? "#94a3b8" : "#64748b"} size={64} style={{ marginBottom: 16 }} />
+          <RNText style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#f1f5f9' : '#0f172a' }}>No calls found</RNText>
+          <RNText style={{ fontSize: 14, fontWeight: '500', color: isDark ? '#94a3b8' : '#64748b', marginTop: 8 }}>Your call history will appear here</RNText>
+        </YStack>
+      ) : (
+        <ScrollView 
+          style={{ flex: 1, zIndex: 5 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}
+        >
+          {filteredLogs.map((log, index) => renderRow(log, index))}
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      )}
+
+      {/* Context Menu Modal */}
+      <Modal visible={!!contextMenu} transparent animationType="fade" onRequestClose={() => setContextMenu(null)}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setContextMenu(null)}>
+          <Animated.View entering={FadeInUp.duration(200)} style={[styles.contextMenu, { top: (contextMenu?.y || 200) - 60, left: Math.min(contextMenu?.x || 100, SCREEN_WIDTH - 200) }]}>
+            <TouchableOpacity style={styles.contextMenuItem} onPress={async () => { setContextMenu(null); if (contextMenu?.log?.peer) { try { const res = await startVoiceCall(contextMenu.log.peer, false); if (res?.call?.id) router.push(`/call/${res.call.id}`); } catch(e) {} } }}>
+              <Phone size={16} color="#005eb8" />
+              <RNText style={styles.contextMenuText}>Voice Call</RNText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.contextMenuItem} onPress={async () => { setContextMenu(null); if (contextMenu?.log?.peer) { try { const res = await startVoiceCall(contextMenu.log.peer, true); if (res?.call?.id) router.push(`/call/${res.call.id}`); } catch(e) {} } }}>
+              <Video size={16} color="#6366f1" />
+              <RNText style={styles.contextMenuText}>Video Call</RNText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.contextMenuItem} onPress={() => { setContextMenu(null); if (contextMenu?.log?.peer?.id) router.push(`/chat/${contextMenu.log.peer.id}`); }}>
+              <MessageSquare size={16} color="#10b981" />
+              <RNText style={styles.contextMenuText}>Message</RNText>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.contextMenuItem, { borderBottomWidth: 0 }]} onPress={() => { setContextMenu(null); if (contextMenu?.log?.id) handleDeleteCall(contextMenu.log.id); }}>
+              <Trash2 size={16} color="#ef4444" />
+              <RNText style={[styles.contextMenuText, { color: '#ef4444' }]}>Delete</RNText>
             </TouchableOpacity>
           </Animated.View>
-        </View>
+        </TouchableOpacity>
       </Modal>
-
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(isDark: boolean) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#0f172a' : '#f0f4ff',
   },
-  blob: {
+  headerGradientAbsolute: {
     position: 'absolute',
-    borderRadius: 999,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 220,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+    zIndex: 0,
   },
-  blob1: {
-    width: 360,
-    height: 360,
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-    top: -80,
-    right: -80,
+  star: {
+    position: 'absolute',
+    width: 3,
+    height: 3,
+    backgroundColor: '#38bdf8',
+    borderRadius: 3,
+    opacity: 0.7,
+    shadowColor: '#38bdf8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
   },
-  blob2: {
-    width: 280,
-    height: 280,
-    backgroundColor: 'rgba(99, 102, 241, 0.06)',
-    bottom: 120,
-    left: -60,
+  headerWave: {
+    position: 'absolute',
+    bottom: -50,
+    right: -20,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    zIndex: 10,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    height: 44,
-  },
-  logoCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: TOKENS.RADIUS.MD,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...TOKENS.SHADOWS.ELEVATED,
-  },
-  appTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: -0.5,
-  },
-  searchBtnShadow: {
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 10,
-    elevation: 5,
-    borderRadius: 21,
-    backgroundColor: '#ffffff',
-  },
-  searchBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchBar: {
+  searchContainer: {
     flex: 1,
+    height: 56,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: TOKENS.RADIUS.LG,
-    paddingHorizontal: 16,
-    height: 44,
-    ...TOKENS.SHADOWS.ELEVATED,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   searchInput: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 15,
-    color: '#0f172a',
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '500',
-    outlineStyle: 'none',
-  } as any,
-  cancelText: {
-    color: '#005eb8',
-    fontWeight: '700',
-    fontSize: 15,
+    paddingHorizontal: 12,
   },
-  filterWrapper: {
-    marginBottom: 8,
-  },
-  filtersContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-    alignItems: 'center',
-  },
-  filterPill: {
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: TOKENS.RADIUS.LG,
-    marginRight: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 40,
-  },
-  filterPillInactive: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    ...TOKENS.SHADOWS.SUBTLE,
-  },
-  filterPillActive: {
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  filterPillActiveMissed: {
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  filterText: {
-    color: '#64748b',
-    fontWeight: '700',
-    fontSize: 14,
-    letterSpacing: 0.2,
-  },
-  filterTextActive: {
-    color: '#ffffff',
-    zIndex: 1,
-  },
-  missedBadgeContainer: {
-    marginLeft: 8,
-    position: 'relative',
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  missedBadgeGlow: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: TOKENS.RADIUS.SM,
-    backgroundColor: '#ef4444',
-  },
-  missedBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: TOKENS.RADIUS.SM,
-    backgroundColor: '#ef4444',
+  searchIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#ffffff',
-  },
-  missedBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '800',
+    overflow: 'hidden',
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 6,
+    paddingTop: 10,
+    paddingBottom: 100,
   },
-  groupCardWrapper: {
-    marginBottom: 20,
-  },
-  sectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#005eb8',
-    marginRight: 8,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#475569',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
+  // ── THEME-ADAPTIVE CARD STYLES ──
   cardContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: TOKENS.RADIUS.LG,
-    ...TOKENS.SHADOWS.ELEVATED,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
+    marginBottom: 8,
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : (isDark ? '#1e293b' : '#ffffff'),
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(199,210,254,0.7)',
     overflow: 'hidden',
+    shadowColor: isDark ? '#06b6d4' : '#818cf8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: isDark ? 0.25 : 0.18,
+    shadowRadius: 20,
+    elevation: Platform.OS === 'web' ? 8 : 2,
+  },
+  cardContainerMissed: {
+    borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : '#fca5a5',
   },
   logRowWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 15,
-    paddingHorizontal: 18,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  rowFirst: {
-    borderTopLeftRadius: TOKENS.RADIUS.LG,
-    borderTopRightRadius: TOKENS.RADIUS.LG,
-  },
-  rowLast: {
-    borderBottomLeftRadius: TOKENS.RADIUS.LG,
-    borderBottomRightRadius: TOKENS.RADIUS.LG,
-    borderBottomWidth: 0,
-  },
-  logRowMissed: {
-    backgroundColor: 'rgba(239, 68, 68, 0.035)',
-  },
-  avatarWrapper: {
-    position: 'relative',
-    width: 46,
-    height: 46,
+    padding: 14,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)',
   },
   avatarFallback: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarImage: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2,
   },
   avatarInitial: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-  },
-  callBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: TOKENS.RADIUS.SM,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
   },
   peerName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
-    maxWidth: 160,
-  },
-  peerNameMissed: {
-    color: '#ef4444',
-  },
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: TOKENS.RADIUS.SM,
-    overflow: 'hidden',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  aiBadgeText: {
-    fontSize: 10,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#ffffff',
+    color: isDark ? '#f1f5f9' : '#0f172a',
+  },
+  directionText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   timeText: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  durationText: {
     fontSize: 12,
-    color: '#94a3b8',
-    fontWeight: '500',
+    fontWeight: '600',
+    color: isDark ? '#94a3b8' : '#64748b',
+    marginBottom: 4,
   },
-  actionBtnShadow: {
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
-    borderRadius: 19,
-    backgroundColor: '#ffffff',
+  callBackBtn: {
+    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    minHeight: 36,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.3)',
   },
-  actionBtnShadowAi: {
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
-    borderRadius: 19,
-    backgroundColor: '#ffffff',
-  },
-  actionBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subtleActionBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: TOKENS.RADIUS.LG,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 94, 184, 0.05)',
+  callBackText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: isDark ? '#e2e8f0' : '#6366f1',
   },
   deleteActionContainer: {
-    width: 80,
+    width: 100,
     height: '100%',
-    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 32,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
   },
   deleteAction: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    height: '100%',
+    width: 60,
   },
-  emptyIconContainer: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
-    elevation: 6,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  emptySub: {
-    fontSize: 14,
-    color: '#64748b',
+  particle: {
+    position: 'absolute',
+    borderRadius: 99,
+    opacity: 0.5,
   },
   fabContainer: {
     position: 'absolute',
-    right: 20,
-    zIndex: 10,
+    bottom: 24,
+    right: 24,
+    zIndex: 20,
   },
-  fabGlow: {
-    position: 'absolute',
-    top: -8,
-    left: -8,
-    right: -8,
-    bottom: -8,
-    borderRadius: 40,
-    backgroundColor: 'rgba(99, 102, 241, 0.35)',
-    filter: 'blur(14px)' as any,
-  },
-  fab: {
-    width: 60,
-    height: 60,
-    borderRadius: TOKENS.RADIUS.XL,
+  fabOuter: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6366f1',
+    overflow: 'hidden',
+    shadowColor: '#06b6d4',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.5,
     shadowRadius: 16,
     elevation: 10,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  bottomSheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: TOKENS.RADIUS.XL,
-    borderTopRightRadius: TOKENS.RADIUS.XL,
-    paddingTop: 16,
-    ...TOKENS.SHADOWS.ELEVATED,
-    overflow: 'hidden',
-  },
-  sheetHandle: {
-    width: 44,
-    height: 5,
-    backgroundColor: '#cbd5e1',
-    borderRadius: 3,
-    alignSelf: 'center',
-    marginBottom: 16,
-    zIndex: 2,
-  },
-  sheetSparkleBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: TOKENS.RADIUS.MD,
+  fabInner: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0f172a',
+  fabCore: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: '#a855f7', // Inner purple neon ring
   },
-  sheetSubtitle: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  sheetCloseIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  summaryBox: {
-    backgroundColor: '#f8fafc',
-    borderRadius: TOKENS.RADIUS.MD,
-    padding: 16,
+  contextMenu: {
+    position: 'absolute',
+    width: 180,
+    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+    borderRadius: 16,
+    shadowColor: isDark ? '#000' : '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f1f5f9',
+    overflow: 'hidden',
+    zIndex: 999,
   },
-  summaryText: {
-    fontSize: 15,
-    color: '#334155',
-    lineHeight: 24,
-    fontWeight: '400',
-  },
-  sheetCloseBtn: {
-    marginTop: 20,
-    marginHorizontal: 16,
-    paddingVertical: 15,
-    borderRadius: TOKENS.RADIUS.MD,
+  contextMenuItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#005eb8',
-    shadowColor: '#005eb8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8fafc',
   },
-  sheetCloseBtnText: {
-    color: '#ffffff',
+  contextMenuText: {
+    fontSize: 15,
     fontWeight: '700',
-    fontSize: 16,
+    color: '#0f172a',
+    marginLeft: 12,
   },
-});
+}); }

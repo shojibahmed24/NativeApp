@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Alert, TextInput, ActivityIndicator, TouchableOpacity, Text as RNText, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useThemeContext } from '../../src/context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming, withRepeat } from 'react-native-reanimated';
@@ -17,6 +18,7 @@ export default function OtpScreen() {
   const [digits, setDigits] = useState<string[]>(Array(6).fill(''));
   const [activeBox, setActiveBox] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
+  const { isDark } = useThemeContext();
   
   const [timer, setTimer] = useState(45);
   
@@ -162,7 +164,7 @@ export default function OtpScreen() {
     <View style={styles.container}>
       {/* Background Gradient */}
       <LinearGradient
-        colors={TOKENS.GRADIENTS.PRIMARY_DARK}
+        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
         locations={[0, 0.5, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -170,8 +172,8 @@ export default function OtpScreen() {
       />
       
       {/* Background Blobs (Different positions from Login) */}
-      <View style={[styles.blob, styles.blob1]} />
-      <View style={[styles.blob, styles.blob2]} />
+      
+      
       
       {/* Header / Back Navigation */}
       <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
@@ -202,15 +204,15 @@ export default function OtpScreen() {
                 <Animated.View style={[styles.glowRing, messageIconStyle]} />
                 <MessageCircle color="#005eb8" size={24} />
               </View>
-              <RNText style={styles.title}>Verification Code</RNText>
-              <RNText style={styles.subtitle}>
+              <RNText style={[styles.title, { color: isDark ? '#ffffff' : '#0f172a' }]}>Verification Code</RNText>
+              <RNText style={[styles.subtitle, { color: isDark ? 'rgba(255,255,255,0.8)' : '#475569' }]}>
                 Enter the OTP sent to <RNText style={styles.boldPhone}>{phone}</RNText>
               </RNText>
             </Animated.View>
 
             {/* Form Card */}
             <Animated.View entering={FadeInUp.duration(600).delay(400).springify()}>
-              <View style={styles.formCard}>
+              <View style={[styles.formCard, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}>
                 <View style={styles.cardAccent} />
                 
                 {/* OTP Input Row */}

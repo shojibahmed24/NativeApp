@@ -1,34 +1,45 @@
 import React from 'react';
+import { Platform, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { YStack, YStackProps } from 'tamagui';
-import { useThemeContext } from '../../src/context/ThemeContext';
+import { useThemeContext } from '../context/ThemeContext';
+import { TOKENS } from '../theme/tokens';
 
-export const GradientBackground = ({ children, ...props }: { children: React.ReactNode } & YStackProps) => {
+export const GradientBackground = ({ children, style, ...props }: { children: React.ReactNode } & YStackProps) => {
   const { isDark } = useThemeContext();
   return (
-    <YStack flex={1} {...props}>
+    <YStack 
+      flex={1} 
+      backgroundColor={isDark ? '#0f172a' : '#f0f4ff'}
+      style={style}
+      {...props}
+    >
       <LinearGradient
-        colors={isDark ? ['#0f172a', '#1e293b', '#0f172a'] : ['#A8E0FF', '#DDF2FF', '#A8E0FF']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
       />
       {children}
     </YStack>
   );
 };
 
-export const GlassCard = ({ children, ...props }: { children: React.ReactNode } & YStackProps) => {
+export const GlassCard = ({ children, style, ...props }: { children: React.ReactNode } & YStackProps) => {
   const { isDark } = useThemeContext();
   return (
     <YStack
-      backgroundColor={isDark ? "rgba(30, 41, 59, 0.7)" : "rgba(255, 255, 255, 0.6)"}
-      borderRadius="$6"
+      backgroundColor={isDark ? "rgba(30, 41, 59, 0.8)" : "rgba(255, 255, 255, 0.75)"}
+      borderRadius={TOKENS.RADIUS.LG}
       padding="$4"
-      shadowColor="#000"
-      shadowOffset={{ width: 0, height: 4 }}
-      shadowOpacity={0.1}
-      shadowRadius={10}
+      borderWidth={1}
+      borderColor={isDark ? "rgba(255, 255, 255, 0.15)" : "#e2e8f0"}
+      elevation={2}
+      style={[
+        Platform.OS === 'web' ? ({ backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' } as any) : { backgroundColor: isDark ? '#1e293b' : '#ffffff' },
+        style
+      ]}
       {...props}
     >
       {children}

@@ -3,8 +3,9 @@ import io from 'socket.io-client/dist/socket.io.js';
 import { api, SOCKET_URL } from '../services/api';
 import { useAuth } from './AuthContext';
 import { startDialingTone, startRingingTone, stopTone, playEndCallTone } from '../utils/audioUtils';
-import { Audio } from 'expo-av';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
+import { Buffer } from 'buffer';
+import { setAudioModeAsync, createAudioPlayer, AudioPlayer } from 'expo-audio';
 
 const CallContext = createContext<any>(null);
 
@@ -46,20 +47,20 @@ export const CallProvider = ({ children }) => {
 
   // Handle Audio Hardware Routing
   useEffect(() => {
-    if (Platform.OS === 'web') return;
     const updateAudioMode = async () => {
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          playThroughEarpieceAndroid: !isSpeakerOn,
+        await setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+          shouldRouteThroughEarpiece: !isSpeakerOn,
+          interruptionMode: 'mixWithOthers'
         });
       } catch (e) {
-        console.error('Failed to set audio mode', e);
+        console.warn('Failed to update audio routing:', e);
       }
     };
     updateAudioMode();
-  }, [isSpeakerOn]);
+  }, [isSpeakerOn, activeCall]);
 
   // Load call history from API when user is available
   useEffect(() => {
@@ -80,7 +81,7 @@ export const CallProvider = ({ children }) => {
     });
     
     // We still emit user:join to trigger presence logic, though backend now uses token user.id
-    socketRef.current.emit('user:join');
+    socketRef.current?.emit('user:join');
 
     // Listen for incoming call
     socketRef.current.on('call:incoming', (data) => {
@@ -97,11 +98,25 @@ export const CallProvider = ({ children }) => {
         }
     });
 
-    socketRef.current.on('call:translated_audio', (data) => {
-      setTranslationStatus('speaking');
-      // Play synthesized audio (Base64) or fallback to text
-      playTranslatedVoice(data.audioBase64, data.translatedText, data.targetLang);
-    });
+    const handleCallTermination = () => {
+      stopTone();
+      playEndCallTone();
+      setActiveCall(null);
+      activeCallRef.current = null;
+      setIncomingCall(null);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setCallDuration(0);
+      setTranslationStatus('ready');
+      setLastTranslatedSpeech(null);
+    };
+
+    socketRef.current.on('call:ended', handleCallTermination);
+    socketRef.current.on('call:rejected', handleCallTermination);
+    socketRef.current.on('call:timeout', handleCallTermination);
+    socketRef.current.on('call:missed', handleCallTermination);
 
     socketRef.current.on('call:translation_error', (data) => {
       console.error('Translation error:', data.message);
@@ -134,7 +149,8 @@ export const CallProvider = ({ children }) => {
         receiverLang: res.call.receiver_lang,
         isTranslated: res.call.is_translated,
         peer: peerUser,
-        livekitToken: res.livekitToken
+        livekitToken: res.livekitToken,
+        isVideo
       };
 
       setActiveCall(callData);
@@ -143,7 +159,7 @@ export const CallProvider = ({ children }) => {
         setTranslationStatus('ready');
         startDialingTone();
 
-      socketRef.current.emit('call:offer', {
+      socketRef.current?.emit('call:offer', {
         callId: res.call.id,
         caller: {
           id: user.id,
@@ -169,8 +185,18 @@ export const CallProvider = ({ children }) => {
     return startVoiceCall(peerUser, true);
   };
 
+  const toggleVideo = () => {
+    setActiveCall(prev => {
+      if (!prev) return prev;
+      const nextState = { ...prev, isVideo: !prev.isVideo };
+      if (activeCallRef.current) activeCallRef.current.isVideo = nextState.isVideo;
+      return nextState;
+    });
+  };
+
   const acceptIncomingCall = async () => {
     if (!incomingCall) return;
+    stopTone();
 
     try {
       const res = await api.joinCall(incomingCall.callId);
@@ -183,7 +209,8 @@ export const CallProvider = ({ children }) => {
         receiverLang: incomingCall.receiverLang,
         isTranslated: incomingCall.isTranslated,
         peer: incomingCall.caller,
-        livekitToken: res.livekitToken
+        livekitToken: res.livekitToken,
+        isVideo: incomingCall.isVideo
       });
 
       setCallDuration(0);
@@ -191,7 +218,7 @@ export const CallProvider = ({ children }) => {
         setCallDuration((prev) => prev + 1);
       }, 1000);
 
-      socketRef.current.emit('call:answer', {
+      socketRef.current?.emit('call:answer', {
         callId: incomingCall.callId,
         callerId: incomingCall.caller.id
       });
@@ -204,7 +231,8 @@ export const CallProvider = ({ children }) => {
 
   const rejectIncomingCall = () => {
     if (!incomingCall) return;
-    socketRef.current.emit('call:reject', {
+    stopTone();
+    socketRef.current?.emit('call:reject', {
       callId: incomingCall.callId,
       callerId: incomingCall.caller.id
     });
@@ -219,7 +247,7 @@ export const CallProvider = ({ children }) => {
     const sourceLang = user.id === activeCallRef.current.callerId ? activeCallRef.current.callerLang : activeCallRef.current.receiverLang;
     const targetLang = user.id === activeCallRef.current.callerId ? activeCallRef.current.receiverLang : activeCallRef.current.callerLang;
 
-    socketRef.current.emit('call:speech_input', {
+    socketRef.current?.emit('call:speech_input', {
       callId: activeCallRef.current.id,
       speakerId: user.id,
       peerId: activeCallRef.current.peer.id,
@@ -233,7 +261,7 @@ export const CallProvider = ({ children }) => {
 
   const triggerBargeIn = () => {
     if (!activeCall) return;
-    socketRef.current.emit('call:interrupt', {
+    socketRef.current?.emit('call:interrupt', {
       callId: activeCall.id,
       speakerId: user.id,
       peerId: activeCall.peer.id
@@ -255,90 +283,146 @@ export const CallProvider = ({ children }) => {
     }
   };
 
-    const playTranslatedVoice = async (base64Audio: string, fallbackText: string, lang: string) => {
-    if (!activeCallRef.current) return; // Ignore delayed audio if call is ended
+  const nativeSoundRef = useRef<AudioPlayer | null>(null);
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingQueueRef = useRef(false);
 
+  // Helper to append a simple 44-byte WAV header to raw PCM16 data
+  const createWavFileFromPcm = (pcmBase64: string, sampleRate = 24000) => {
     try {
-      if (Platform.OS === 'web') {
-        initAudioCtx();
-        // Stop any currently playing audio (Barge-in support)
-        if (activeAudioSourceRef.current) {
-          activeAudioSourceRef.current.stop();
-          activeAudioSourceRef.current.disconnect();
-        }
+      // Use Buffer instead of window.atob to avoid crashes on React Native
+      const Buffer = require('buffer').Buffer;
+      const pcmBuffer = Buffer.from(pcmBase64, 'base64');
+      const pcmLen = pcmBuffer.length;
+      
+      const wavBuffer = Buffer.alloc(44 + pcmLen);
 
-        if (!base64Audio) {
-          console.warn('No base64 audio received, falling back to browser TTS');
-          if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(fallbackText);
-            utterance.lang = lang === 'bn' ? 'bn-BD' : lang === 'hi' ? 'hi-IN' : lang === 'ar' ? 'ar-SA' : 'en-US';
-            utterance.onend = () => setTranslationStatus('ready');
-            window.speechSynthesis.speak(utterance);
-          } else {
-            setTimeout(() => setTranslationStatus('ready'), 2000);
-          }
-          return;
-        }
-
-        const binaryString = window.atob(base64Audio);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-
-        const audioBuffer = await audioCtxRef.current.decodeAudioData(bytes.buffer);
-        const source = audioCtxRef.current.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioCtxRef.current.destination);
-        
-        source.onended = () => {
-          setTranslationStatus('ready');
-          activeAudioSourceRef.current = null;
-        };
-        
-        activeAudioSourceRef.current = source;
-        source.start(0);
-      } else {
-        // --- NATIVE MOBILE PLAYBACK ---
-        if (nativeSoundRef.current) {
-          try {
-            await nativeSoundRef.current.stopAsync();
-            await nativeSoundRef.current.unloadAsync();
-          } catch(e){}
-          nativeSoundRef.current = null;
-        }
-
-        if (base64Audio) {
-          const uri = `data:audio/mpeg;base64,${base64Audio}`;
-          const { sound } = await Audio.Sound.createAsync({ uri });
-          nativeSoundRef.current = sound;
-          
-          sound.setOnPlaybackStatusUpdate((status: any) => {
-            if (status.didJustFinish) {
-              setTranslationStatus('ready');
-              sound.unloadAsync();
-              nativeSoundRef.current = null;
-            }
-          });
-          
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: true,
-            interruptionModeIOS: 1, // DoNotMix
-            interruptionModeAndroid: 1, // DoNotMix
-          });
-          await sound.playAsync();
-        } else {
-          setTranslationStatus('ready');
-        }
-      }
-    } catch (err) {
-      console.error('Failed to play translated audio:', err);
-      setTranslationStatus('ready');
+      // RIFF chunk descriptor
+      wavBuffer.write('RIFF', 0);
+      wavBuffer.writeUInt32LE(36 + pcmLen, 4);
+      wavBuffer.write('WAVE', 8);
+      
+      // fmt sub-chunk
+      wavBuffer.write('fmt ', 12);
+      wavBuffer.writeUInt32LE(16, 16); // Subchunk1Size
+      wavBuffer.writeUInt16LE(1, 20); // AudioFormat (PCM)
+      wavBuffer.writeUInt16LE(1, 22); // NumChannels
+      wavBuffer.writeUInt32LE(sampleRate, 24); // SampleRate
+      wavBuffer.writeUInt32LE(sampleRate * 2, 28); // ByteRate
+      wavBuffer.writeUInt16LE(2, 32); // BlockAlign
+      wavBuffer.writeUInt16LE(16, 34); // BitsPerSample
+      
+      // data sub-chunk
+      wavBuffer.write('data', 36);
+      wavBuffer.writeUInt32LE(pcmLen, 40);
+      
+      // Write PCM data
+      pcmBuffer.copy(wavBuffer, 44);
+      
+      return wavBuffer.toString('base64');
+    } catch(e) {
+      console.error('WAV conversion error:', e);
+      return null;
     }
   };
 
-      const endCurrentCall = async () => {
+  const processNativeAudioQueue = async () => {
+    if (isPlayingQueueRef.current || audioQueueRef.current.length === 0 || !activeCallRef.current) return;
+    
+    isPlayingQueueRef.current = true;
+    try {
+      const pcmBase64 = audioQueueRef.current.shift();
+      if (pcmBase64) {
+        const wavBase64 = createWavFileFromPcm(pcmBase64, 24000);
+        if (wavBase64) {
+          const uri = `data:audio/wav;base64,${wavBase64}`;
+          const player = createAudioPlayer(uri);
+          nativeSoundRef.current = player;
+          
+          await setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: true,
+            interruptionMode: 'mixWithOthers',
+          });
+          
+          player.play();
+          
+          player.addListener('playbackStatusUpdate', (status: any) => {
+            if (status.didJustFinish) {
+              player.release();
+              nativeSoundRef.current = null;
+              isPlayingQueueRef.current = false;
+              // Play next chunk
+              processNativeAudioQueue();
+              if (audioQueueRef.current.length === 0) {
+                setTranslationStatus('ready');
+              }
+            }
+          });
+          return; // Wait for callback to continue
+        }
+      }
+    } catch (err) {
+      console.error('Playback queue error:', err);
+    }
+    
+    isPlayingQueueRef.current = false;
+    processNativeAudioQueue();
+  };
+
+  let nextPlayTime = 0; // Web Audio API scheduling
+
+  const playTranslatedVoiceStream = async (pcmBase64: string, sampleRate: number) => {
+    if (!activeCallRef.current) return;
+
+    if (Platform.OS === 'web') {
+      initAudioCtx();
+      try {
+        const binaryString = window.atob(pcmBase64);
+        const len = binaryString.length;
+        // Int16Array parse
+        const int16Array = new Int16Array(len / 2);
+        for (let i = 0; i < len; i += 2) {
+          // Little endian
+          const lsb = binaryString.charCodeAt(i);
+          const msb = binaryString.charCodeAt(i + 1);
+          int16Array[i / 2] = (msb << 8) | lsb;
+        }
+
+        const float32 = new Float32Array(int16Array.length);
+        for (let i = 0; i < int16Array.length; i++) {
+          float32[i] = int16Array[i] / 32768.0;
+        }
+
+        const buffer = audioCtxRef.current.createBuffer(1, float32.length, sampleRate);
+        buffer.copyToChannel(float32, 0);
+        const source = audioCtxRef.current.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtxRef.current.destination);
+        
+        if (nextPlayTime < audioCtxRef.current.currentTime) {
+          nextPlayTime = audioCtxRef.current.currentTime;
+        }
+        
+        source.start(nextPlayTime);
+        nextPlayTime += buffer.duration;
+        
+        source.onended = () => {
+          if (audioCtxRef.current.currentTime >= nextPlayTime - 0.1) {
+            setTranslationStatus('ready');
+          }
+        };
+      } catch (err) {
+        console.error('Web audio stream err:', err);
+      }
+    } else {
+      // Native queue
+      audioQueueRef.current.push(pcmBase64);
+      processNativeAudioQueue();
+    }
+  };
+
+  const endCurrentCall = async () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -357,7 +441,7 @@ export const CallProvider = ({ children }) => {
         console.error('Failed to end call in backend:', err);
       } finally {
         if (socketRef.current) {
-          socketRef.current.emit('call:end', {
+          socketRef.current?.emit('call:end', {
             callId: activeCall.id,
             peerId: activeCall.peer?.id,
             durationSeconds: callDuration,
@@ -370,8 +454,6 @@ export const CallProvider = ({ children }) => {
 
     stopTone();
     setActiveCall(null);
-      activeCallRef.current = null;
-    activeCallRef.current = null;
     activeCallRef.current = null;
     setCallDuration(0);
     setLastTranslatedSpeech(null);
@@ -394,6 +476,7 @@ export const CallProvider = ({ children }) => {
         callHistory,
         startVoiceCall,
         startVideoCall,
+        toggleVideo,
         acceptIncomingCall,
         rejectIncomingCall,
         endCurrentCall,

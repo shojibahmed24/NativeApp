@@ -23,6 +23,17 @@ export const encryptMessage = async (text, myId, peerId) => {
   }
 };
 
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+function decodeBase64(input) {
+  try { if (typeof atob !== 'undefined') return atob(input); } catch (e) {}
+  let str = String(input).replace(/=+$/, '');
+  let output = '';
+  for (let bc = 0, bs, buffer, idx = 0; buffer = str.charAt(idx++); ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0) {
+    buffer = chars.indexOf(buffer);
+  }
+  return output;
+}
+
 export const decryptMessage = async (encryptedPayload, myId, peerId) => {
   if (!encryptedPayload) return encryptedPayload;
   
@@ -30,7 +41,7 @@ export const decryptMessage = async (encryptedPayload, myId, peerId) => {
   if (!encryptedPayload.startsWith('CJS:')) {
     try {
       // If it's a plain text string that was never encrypted, JSON.parse will fail and fall through.
-      const { iv, data } = JSON.parse(atob(encryptedPayload));
+      const { iv, data } = JSON.parse(decodeBase64(encryptedPayload));
       // Can't decrypt old WebCrypto payloads in HTTP context without crypto.subtle, so we just return it.
       // If we are in HTTPS, we could fall back to WebCrypto here, but for local network this is fine.
       return encryptedPayload; 

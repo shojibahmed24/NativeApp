@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, Platform, Pressable, ActivityIndicator, StatusBar } from 'react-native';
 import { YStack, XStack, Text } from 'tamagui';
 import { Phone, Delete, AlertCircle, PhoneCall } from 'lucide-react-native';
 import { GlassCard } from '../src/components/ThemeComponents';
@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TOKENS } from '../src/theme/tokens';
+import { useThemeContext } from '../src/context/ThemeContext';
 
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -43,6 +44,7 @@ const BlinkingCursor = () => {
 };
 
 const AnimatedDigit = ({ char, index, isClearing }: { char: string, index: number, isClearing: boolean }) => {
+  const { isDark } = useThemeContext();
   const scale = useSharedValue(1.2);
   const opacity = useSharedValue(0);
   
@@ -65,7 +67,7 @@ const AnimatedDigit = ({ char, index, isClearing }: { char: string, index: numbe
   }));
 
   return (
-    <Animated.Text style={[styles.digitText, style]}>
+    <Animated.Text style={[styles.digitText, style, { color: isDark ? '#fff' : '#0f172a' }]}>
       {char}
     </Animated.Text>
   );
@@ -83,26 +85,38 @@ const PulsingPlus = () => {
 };
 
 const DialButton = ({ number, letters, onPress, onLongPress, index }: any) => {
+  const { isDark } = useThemeContext();
   const { animatedStyle, onPressIn, onPressOut } = useButtonScale(0.93, Haptics.ImpactFeedbackStyle.Light);
   const [isPressed, setIsPressed] = useState(false);
   
   const handlePressIn = () => { setIsPressed(true); onPressIn(); };
   const handlePressOut = () => { setIsPressed(false); onPressOut(); };
 
+  // Glass styles
+  const btnBg = isPressed ? (isDark ? '#334155' : '#e2e8f0') : (isDark ? '#1e293b' : '#f1f5f9');
+    
+  const numColor = isDark ? '#ffffff' : '#0f172a';
+  const letterColor = isDark ? '#94a3b8' : '#64748b';
+  const pressedColor = isDark ? '#38bdf8' : '#0ea5e9';
+
   return (
     <Animated.View entering={FadeInUp.delay(50 + index * 20).springify()}>
       <AnimatedPressable 
         onPressIn={handlePressIn} onPressOut={handlePressOut} 
         onPress={onPress} onLongPress={onLongPress}
-        style={[styles.dialBtnWrapper, animatedStyle]}
+        style={[
+          styles.dialBtnWrapper, 
+          animatedStyle, 
+          { 
+            backgroundColor: btnBg, 
+            borderWidth: 0,
+            shadowOpacity: 0, 
+            elevation: 0 
+          }
+        ]}
       >
-        <LinearGradient 
-          colors={isPressed ? ['#e0f2fe', '#bae6fd'] : ['#ffffff', '#f8fafc']} 
-          start={{x:0, y:0}} end={{x:1, y:1}}
-          style={styles.dialBtnGradient} 
-        />
-        <Text style={[styles.dialNum, isPressed && { color: '#0369a1' }]}>{number}</Text>
-        <Text style={[styles.dialLetters, isPressed && { color: '#0284c7' }]}>{letters}</Text>
+        <Text style={[styles.dialNum, { color: isPressed ? pressedColor : numColor }]}>{number}</Text>
+        <Text style={[styles.dialLetters, { color: isPressed ? pressedColor : letterColor }]}>{letters}</Text>
         {number === '0' && <PulsingPlus />}
       </AnimatedPressable>
     </Animated.View>
@@ -113,6 +127,7 @@ export default function DialpadModal() {
   const router = useRouter();
   const { startVoiceCall } = useCall();
   const insets = useSafeAreaInsets();
+  const { isDark } = useThemeContext();
   
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isCalling, setIsCalling] = useState(false);
@@ -140,11 +155,13 @@ export default function DialpadModal() {
   };
 
   const handlePress = (num: string) => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setError('');
     setPhoneNumber(prev => prev + num);
   };
 
   const handleDelete = () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setError('');
     setPhoneNumber(prev => prev.slice(0, -1));
   };
@@ -212,12 +229,9 @@ export default function DialpadModal() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY_DARK} locations={[0, 0.4, 0.7]} style={StyleSheet.absoluteFillObject} />
+    <View style={[styles.container, { backgroundColor: isDark ? '#0f172a' : '#ffffff' }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} translucent backgroundColor="transparent" />
       
-      {/* Background glow blobs (ambient color circles instead of unsupported filter:blur) */}
-      <View style={styles.glowBlob1} />
-      <View style={styles.glowBlob2} />
 
       <View style={{ flex: 1, paddingTop: Math.max(insets.top, 20) }}>
         
@@ -226,14 +240,14 @@ export default function DialpadModal() {
           <AnimatedPressable 
             onPressIn={cancelScale.onPressIn} onPressOut={cancelScale.onPressOut}
             onPress={() => { if(router.canGoBack()) router.back(); else router.push('/(main)/calls'); }}
-            style={[styles.cancelBtn, cancelScale.animatedStyle]}
+            style={[styles.cancelBtn, cancelScale.animatedStyle, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
           >
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={[styles.cancelText, { color: isDark ? '#fff' : '#0f172a' }]}>Cancel</Text>
           </AnimatedPressable>
           
           <XStack alignItems="center" space="$2">
-            <PhoneCall color="#fff" size={18} opacity={0.9} />
-            <Text style={styles.headerTitle}>Dialpad</Text>
+            <PhoneCall color={isDark ? "#fff" : "#0f172a"} size={18} opacity={0.9} />
+            <Text style={[styles.headerTitle, { color: isDark ? '#fff' : '#0f172a' }]}>Dialpad</Text>
           </XStack>
           <View style={{ width: 70 }} />
         </Animated.View>
@@ -251,7 +265,7 @@ export default function DialpadModal() {
               {phoneNumber ? (
                 phoneNumber.split('').map((char, idx) => <AnimatedDigit key={`${idx}-${char}`} char={char} index={idx} isClearing={isClearing} />)
               ) : (
-                <Text style={styles.placeholderText}>Enter number</Text>
+                <Text style={[styles.placeholderText, { color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)' }]}>Enter number</Text>
               )}
               {phoneNumber.length > 0 && <BlinkingCursor />}
             </ScrollView>
@@ -270,10 +284,8 @@ export default function DialpadModal() {
         </Animated.View>
 
         {/* Dialpad Grid */}
-        <GlassCard style={styles.glassCard} padding="$6">
-          <View style={styles.glassTopHighlight} />
-          
-          <YStack flex={1} justifyContent="space-between">
+        <View style={{ flex: 1, paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 20 }}>
+          <YStack flex={1} justifyContent="space-evenly" paddingBottom="$4">
             <XStack justifyContent="space-around">
               <DialButton number="1" letters="" onPress={() => handlePress('1')} index={0} />
               <DialButton number="2" letters="ABC" onPress={() => handlePress('2')} index={1} />
@@ -297,19 +309,27 @@ export default function DialpadModal() {
             
             {/* Bottom Actions */}
             <Animated.View entering={FadeInUp.delay(300)}>
-              <XStack justifyContent="space-around" alignItems="center" marginTop="$2">
-                <View style={{ width: 75 }} />
+              <XStack justifyContent="space-around" alignItems="center" marginTop="$4" paddingHorizontal="$6">
+                <View style={{ width: 80 }} />
                 
                 {/* Call Button */}
                 <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                  {phoneNumber.length > 0 && <Animated.View style={[styles.callBtnGlow, glowStyle]} />}
+                  {phoneNumber.length > 0 && <Animated.View style={[styles.callBtnGlow, glowStyle, { backgroundColor: '#10b981' }]} />}
                   <AnimatedPressable
                     onPressIn={callScale.onPressIn} onPressOut={callScale.onPressOut} onPress={handleCall}
                     disabled={isCalling || !phoneNumber}
-                    style={[styles.callBtnWrapper, callScale.animatedStyle]}
+                    style={[
+                      styles.callBtnWrapper, 
+                      callScale.animatedStyle, 
+                      { 
+                        shadowColor: '#10b981',
+                        elevation: phoneNumber ? 8 : 0,
+                        shadowOpacity: phoneNumber ? 0.35 : 0,
+                      }
+                    ]}
                   >
                     <LinearGradient 
-                      colors={!phoneNumber ? ['rgba(148,163,184,0.6)', 'rgba(100,116,139,0.6)'] : ['#005eb8', '#22c55e']} 
+                      colors={!phoneNumber ? (isDark ? ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)'] : ['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.05)']) : ['#10b981', '#059669']} 
                       start={{x:0, y:0}} end={{x:1, y:1}}
                       style={StyleSheet.absoluteFillObject} 
                     />
@@ -317,28 +337,36 @@ export default function DialpadModal() {
                       {isCalling ? (
                         <ActivityIndicator color="#fff" size="large" />
                       ) : (
-                        <Phone color="white" size={34} fill={phoneNumber ? "white" : "transparent"} />
+                        <Phone color={!phoneNumber ? (isDark ? '#94a3b8' : '#64748b') : "white"} size={34} fill={phoneNumber ? "white" : "transparent"} />
                       )}
                     </View>
                   </AnimatedPressable>
                 </View>
                 
                 {/* Delete Button */}
-                <View style={{ width: 75, alignItems: 'center' }}>
+                <View style={{ width: 80, alignItems: 'center' }}>
                   {phoneNumber.length > 0 && (
                     <AnimatedPressable
                       onPressIn={delScale.onPressIn} onPressOut={delScale.onPressOut} 
                       onPress={handleDelete} onLongPress={handleClearAll}
-                      style={[styles.deleteBtn, delScale.animatedStyle]}
+                      style={[
+                        styles.deleteBtn, 
+                        delScale.animatedStyle, 
+                        { 
+                          backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                          borderWidth: 1,
+                          borderColor: isDark ? 'rgba(255,255,255,0.12)' : '#e2e8f0'
+                        }
+                      ]}
                     >
-                      <Delete color={TOKENS.COLORS.TEXT_SECONDARY} size={26} />
+                      <Delete color={isDark ? '#ffffff' : '#0f172a'} size={26} />
                     </AnimatedPressable>
                   )}
                 </View>
               </XStack>
             </Animated.View>
           </YStack>
-        </GlassCard>
+        </View>
         
       </View>
     </View>
@@ -354,12 +382,12 @@ const styles = StyleSheet.create({
   cancelText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   headerTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
   numberScrollContainer: { alignItems: 'center', justifyContent: 'center', minWidth: '100%', paddingHorizontal: 20 },
-  digitText: { fontSize: 48, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(56,189,248,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8, marginHorizontal: 1 },
+  digitText: { fontSize: 48, fontWeight: '700', color: '#fff', marginHorizontal: 1 },
   placeholderText: { fontSize: 36, fontWeight: '400', color: 'rgba(255,255,255,0.4)' },
   cursor: { width: 3, height: 44, backgroundColor: '#38bdf8', borderRadius: 2, marginLeft: 4 },
   glassCard: { flex: 1, borderTopLeftRadius: 36, borderTopRightRadius: 36, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden', paddingBottom: Platform.OS === 'ios' ? 40 : 20 },
   glassTopHighlight: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.8)', zIndex: 1 },
-  dialBtnWrapper: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...TOKENS.SHADOWS.ELEVATED },
+  dialBtnWrapper: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   dialBtnGradient: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 38 },
   dialNum: { color: '#0f172a', fontSize: 38, fontWeight: '500', lineHeight: 42, zIndex: 1 },
   dialLetters: { color: '#64748b', fontSize: 11, fontWeight: '700', letterSpacing: 1.5, zIndex: 1 },

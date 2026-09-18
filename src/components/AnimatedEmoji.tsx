@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Platform, Text as RNText } from 'react-native';
+import { View, Platform, StyleProp, ViewStyle } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -7,18 +7,26 @@ import Animated, {
   withSequence, 
   withTiming, 
   withRepeat,
+  cancelAnimation,
   Easing
 } from 'react-native-reanimated';
 
 interface AnimatedEmojiProps {
   emoji?: string;
+  size?: number;
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
-export default function AnimatedEmoji({ emoji = '❤️' }: AnimatedEmojiProps) {
+export default function AnimatedEmoji({ emoji = '❤️', size = 80, containerStyle }: AnimatedEmojiProps) {
   const scale = useSharedValue(0);
   const rotate = useSharedValue(0);
 
   useEffect(() => {
+    cancelAnimation(scale);
+    cancelAnimation(rotate);
+    scale.value = 0;
+    rotate.value = 0;
+
     if (emoji === '❤️' || emoji === '🔥' || emoji === '😍' || emoji === '😘') {
       scale.value = withSequence(
         withSpring(1.4, { damping: 5, stiffness: 80 }),
@@ -48,6 +56,11 @@ export default function AnimatedEmoji({ emoji = '❤️' }: AnimatedEmojiProps) 
         withSpring(1, { damping: 12, stiffness: 100 })
       );
     }
+
+    return () => {
+      cancelAnimation(scale);
+      cancelAnimation(rotate);
+    };
   }, [emoji]);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -60,8 +73,8 @@ export default function AnimatedEmoji({ emoji = '❤️' }: AnimatedEmojiProps) 
   });
 
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', width: 140, height: 140, padding: 10 }}>
-      <Animated.Text style={[{ fontSize: 80, textAlign: 'center' }, animatedStyle]}>
+    <View style={[{ alignItems: 'center', justifyContent: 'center', padding: 8 }, containerStyle]}>
+      <Animated.Text style={[{ fontSize: size, textAlign: 'center', includeFontPadding: false }, animatedStyle]}>
         {emoji}
       </Animated.Text>
     </View>

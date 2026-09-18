@@ -6,9 +6,9 @@ import { MicOff, Grid, Volume2, Plus, Video, MessageSquare, PhoneOff, Mic, Volum
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LiveKitWrapper from '../../src/components/LiveKitWrapper';
 import { useCall } from '../../src/context/CallContext';
+import LiveKitVideoView from '../../src/components/LiveKitVideoView';
 import { useAuth } from '../../src/context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Audio } from 'expo-av';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -76,8 +76,8 @@ const PulseRing = ({ isAnimating, size, isTranslating }: { isAnimating: boolean,
 
   return (
     <Animated.View style={[
-      StyleSheet.absoluteFillObject,
       {
+        position: 'absolute',
         borderRadius: size,
         width: size,
         height: size,
@@ -104,28 +104,15 @@ export default function CallScreen() {
     endCurrentCall, 
     translationStatus,
     lastTranslatedSpeech,
-      socket
+      socket,
+      toggleVideo
     } = useCall();
 
   const isMutedRef = React.useRef(isMuted);
   React.useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
 
   React.useEffect(() => {
-    const updateAudioMode = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          playThroughEarpieceAndroid: !isSpeakerOn,
-        });
-      } catch (err) {
-        console.warn('Audio mode error:', err);
-      }
-    };
-    if (Platform.OS !== 'web') updateAudioMode();
   }, [isSpeakerOn]);
-  
-  const [recording, setRecording] = React.useState<Audio.Recording | null>(null);
   const [isTranslatingLocal, setIsTranslatingLocal] = React.useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -140,6 +127,16 @@ export default function CallScreen() {
   const contactAvatar = activeCall?.peer?.avatar || null;
   const isCallActive = !!activeCall;
 
+  // Auto-dismiss the call screen if the peer ends or rejects the call
+  React.useEffect(() => {
+    if (!activeCall) {
+      const t = setTimeout(() => {
+        router.replace('/(main)/calls');
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [activeCall]);
+
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
@@ -148,7 +145,6 @@ export default function CallScreen() {
 
   const handleEndCall = async () => {
     try {
-      if (recording) await recording.stopAndUnloadAsync();
     } catch (e) {
       console.warn('Error stopping recording:', e);
     }
@@ -161,105 +157,8 @@ export default function CallScreen() {
   const silenceThresholdFrames = 5; // ~1 second of silence at 200ms intervals
   const isSpeakingRef = React.useRef(false);
   const silenceFramesRef = React.useRef(0);
-  const recordingRef = React.useRef<Audio.Recording | null>(null);
 
-  const startVADRecording = async () => {
-    try {
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      
-      // Enable Hardware Acoustic Echo Cancellation (AEC) by overriding Android audio source to VOICE_COMMUNICATION (7)
-      const customOptions = {
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        android: {
-          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,
-          audioSource: 7, // MediaRecorder.AudioSource.VOICE_COMMUNICATION (Enables AEC)
-        }
-      };
-      const { recording: newRecording } = await Audio.Recording.createAsync(customOptions);
-      
-      newRecording.setProgressUpdateInterval(200);
-      newRecording.setOnRecordingStatusUpdate(async (status) => {
-        if (!status.isRecording || isMutedRef.current) return;
-        
-        const metering = status.metering || -100;
-        if (metering > vadThreshold) {
-          isSpeakingRef.current = true;
-          silenceFramesRef.current = 0;
-        } else {
-          if (isSpeakingRef.current) {
-            silenceFramesRef.current += 1;
-            if (silenceFramesRef.current >= silenceThresholdFrames) {
-              isSpeakingRef.current = false;
-              silenceFramesRef.current = 0;
-              }
-          }
-        }
-      });
-      
-      recordingRef.current = newRecording;
-      setRecording(newRecording);
-    } catch (err) {
-      console.error('Failed to start VAD recording', err);
-    }
-  };
-
-  const processAndRestartRecording = async (currentRec: Audio.Recording) => {
-    try {
-      await currentRec.stopAndUnloadAsync();
-      const uri = currentRec.getURI();
-      if (uri) {
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64data = (reader.result as string).split(',')[1];
-          if (activeCall && user) {
-              const sourceLang = user.id === activeCall.callerId ? activeCall.callerLang : activeCall.receiverLang;
-              const targetLang = user.id === activeCall.callerId ? activeCall.receiverLang : activeCall.callerLang;
-              
-              socket?.emit('call:speech_input', { 
-                callId: id, 
-                speakerId: user.id,
-                peerId: activeCall.peer?.id,
-                sourceLang: sourceLang || 'en',
-                targetLang: targetLang || 'en',
-                audioBase64: base64data, 
-                isFinal: true
-              });
-            }
-        };
-        reader.readAsDataURL(blob);
-      }
-      
-      if (false) {
-        
-      }
-    } catch (err) {
-      console.error('Error processing VAD chunk:', err);
-    }
-  };
-
-  const toggleTranslation = async () => {
-    Platform.OS !== 'web' && Haptics.impactAsync();
-    try {
-      if (false) {
-        setIsTranslatingLocal(false);
-        if (recordingRef.current) {
-          await recordingRef.current.stopAndUnloadAsync();
-          recordingRef.current = null;
-          setRecording(null);
-        }
-      } else {
-        setIsTranslatingLocal(true);
-        
-      }
-    } catch (err) {
-      console.error('Failed to toggle translation mic', err);
-    }
-  };
-
-  let statusText = 'Connecting...';
+    let statusText = 'Connecting...';
   if (isCallActive) {
     if (translationStatus === 'interpreting') statusText = 'Interpreting AI...';
     else if (translationStatus === 'speaking') statusText = 'AI is Speaking...';
@@ -275,23 +174,20 @@ export default function CallScreen() {
 
   return (
     <View style={styles.container}>
-      <LiveKitWrapper token={activeCall?.livekitToken || ''} serverUrl={LIVEKIT_URL}>
-      <View style={styles.backgroundImage}>
-        {activeCall?.isVideo && permission?.granted ? (
-          Platform.OS === 'web' 
-            ? <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "#000", justifyContent: "center", alignItems: "center" }]}><Text color="white">Video preview not available on web</Text></View>
-            : <View style={StyleSheet.absoluteFillObject}><CameraView style={StyleSheet.absoluteFillObject} facing="front" /></View>
-        ) : (
-          contactAvatar
-            ? <ImageBackground source={{ uri: contactAvatar }} style={StyleSheet.absoluteFillObject} blurRadius={Platform.OS === 'web' ? 20 : 50} />
-            : <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY_DARK} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-        )}
+      <LiveKitWrapper token={activeCall?.livekitToken || ''} activeCall={activeCall} serverUrl={LIVEKIT_URL}>
+      <View style={[StyleSheet.absoluteFillObject, { zIndex: 0 }]}>
+        <View style={styles.backgroundImage}>
+          {activeCall?.isVideo && permission?.granted ? (
+            <LiveKitVideoView />
+          ) : (
+            <LinearGradient colors={['#090d16', '#0f172a', '#1e1b4b']} start={{x:0.5,y:0}} end={{x:0.5,y:1}} style={StyleSheet.absoluteFillObject} />
+          )}
+        </View>
+        <View style={styles.darkOverlay} />
+        <BackgroundWash />
       </View>
-
-      <View style={styles.darkOverlay} />
-      <BackgroundWash />
       
-      <YStack flex={1} padding="$6" paddingTop="$10" justifyContent="space-between" style={StyleSheet.absoluteFillObject} zIndex={10}>
+      <YStack flex={1} padding="$6" paddingTop={Platform.OS === 'android' ? 40 : "$10"} paddingBottom={Platform.OS === 'android' ? 20 : "$6"} justifyContent="space-between" zIndex={10}>
         
         <XStack justifyContent="space-between" alignItems="center">
           <ScaleButton onPress={() => router.back()} style={styles.headerButton}>
@@ -307,20 +203,24 @@ export default function CallScreen() {
         </XStack>
 
         <YStack alignItems="center" space="$4">
-          <View style={[styles.avatarContainer, { shadowColor: '#a78bfa', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 30, elevation: 15 }]}>
-            <PulseRing isAnimating={isPulseActive} size={140} isTranslating={translationStatus === 'interpreting' || translationStatus === 'speaking'} />
-            <PulseRing isAnimating={isPulseActive} size={180} isTranslating={translationStatus === 'interpreting' || translationStatus === 'speaking'} />
-            <View style={{ width: 120, height: 120, borderRadius: 60, overflow: 'hidden', backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center' }}>
-              {contactAvatar ? (
-                <Image source={{ uri: contactAvatar }} style={{ width: 120, height: 120, borderRadius: 60, resizeMode: 'cover' }} />
-              ) : (
-                <View style={{ flex: 1, width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
-                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
-                  <Text color="#fff" fontSize={48} fontWeight="bold" zIndex={1}>
-                    {contactName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-              )}
+          <View style={[styles.avatarContainer]}>
+            <PulseRing isAnimating={isPulseActive} size={160} isTranslating={translationStatus === 'interpreting' || translationStatus === 'speaking'} />
+            <PulseRing isAnimating={isPulseActive} size={200} isTranslating={translationStatus === 'interpreting' || translationStatus === 'speaking'} />
+            {/* Glowing border ring */}
+            <View style={{ width: 132, height: 132, borderRadius: 66, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+              <LinearGradient colors={['#818cf8', '#c084fc', '#38bdf8']} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+              <View style={{ width: 124, height: 124, borderRadius: 62, overflow: 'hidden', backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center' }}>
+                {contactAvatar ? (
+                  <Image source={{ uri: contactAvatar }} style={{ width: 124, height: 124, borderRadius: 62, resizeMode: 'cover' }} />
+                ) : (
+                  <View style={{ flex: 1, width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+                    <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                    <Text color="#fff" fontSize={48} fontWeight="bold" zIndex={1}>
+                      {contactName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
           
@@ -361,38 +261,42 @@ export default function CallScreen() {
         ) : null}
 
         <Animated.View entering={FadeInUp.delay(500)} style={styles.bottomControls}>
-          <View style={{ borderRadius: 40, padding: 20, paddingTop: 30, paddingBottom: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', borderBottomWidth: 0, backgroundColor: 'rgba(20, 20, 25, 0.3)' }}>
-            <View style={[StyleSheet.absoluteFillObject, { borderRadius: 40, overflow: 'hidden' }]} pointerEvents="none">
-              <LinearGradient colors={['rgba(255,255,255,0.1)', 'rgba(139,92,246,0.05)']} start={{x:0, y:0}} end={{x:0, y:1}} style={StyleSheet.absoluteFillObject} />
-            </View>
+          <View style={{ borderRadius: 40, padding: 24, paddingTop: 32, paddingBottom: 32, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderBottomWidth: 0, backgroundColor: '#0f172af0' }}>
             <YStack space="$6">
-              <XStack justifyContent="space-around" alignItems="center">
+              <XStack justifyContent="space-evenly" alignItems="center">
                 <GlassButton 
-                  icon={isMuted ? <MicOff color="#fff" size={24} /> : <Mic color="#fff" size={24} />} 
+                  icon={isMuted ? <MicOff color="#fff" size={26} /> : <Mic color="#fff" size={26} />} 
                   onPress={() => { setIsMuted(!isMuted); }} 
-                  label="Mute"
+                  label={isMuted ? "Unmute" : "Mute"}
                   isActive={isMuted}
-                  activeColor="rgba(239, 68, 68, 0.3)"
+                  activeColor="rgba(239, 68, 68, 0.35)"
                   glowColor="#ef4444"
                 />
                 <GlassButton 
-                  icon={<Video color="#fff" size={24} />} 
-                  onPress={() => {}} 
+                  icon={<Video color="#fff" size={26} />} 
+                  onPress={toggleVideo} 
                   label="Video"
                   isActive={activeCall?.isVideo}
-                  activeColor="rgba(59, 130, 246, 0.3)"
+                  activeColor="rgba(59, 130, 246, 0.35)"
                   glowColor="#3b82f6"
                 />
                 <GlassButton 
-                  icon={<Volume2 color="#fff" size={24} />} 
-                  onPress={() => { setIsSpeakerOn(!isSpeakerOn); }} 
+                  icon={isSpeakerOn ? <Volume2 color="#fff" size={26} /> : <VolumeX color="#fff" size={26} />} 
+                  onPress={() => { 
+                    if (Platform.OS === 'web') {
+                      // On web, speaker toggle isn't supported by expo-av
+                      return;
+                    }
+                    setIsSpeakerOn(!isSpeakerOn); 
+                  }} 
                   label="Speaker"
                   isActive={isSpeakerOn}
-                  activeColor="rgba(59, 130, 246, 0.3)"
+                  activeColor="rgba(59, 130, 246, 0.35)"
                   glowColor="#3b82f6"
+                  disabled={Platform.OS === 'web'}
                 />
               </XStack>
-              <XStack justifyContent="center" marginTop="$2">
+              <XStack justifyContent="center" marginTop="$3">
                 <View style={{ position: 'relative' }}>
                   <EndCallPulse />
                   <ScaleButton onPress={handleEndCall} activeScale={0.85} haptic={Haptics.NotificationFeedbackType.Error}>
@@ -448,12 +352,12 @@ const PulsingStatusIcon = ({ color }: { color: string }) => {
   );
 };
 
-const GlassButton = ({ icon, onPress, label, isActive, activeColor, glowColor }: any) => (
-  <YStack alignItems="center" space="$2">
-    <ScaleButton onPress={onPress}>
+const GlassButton = ({ icon, onPress, label, isActive, activeColor, glowColor, disabled }: any) => (
+  <YStack alignItems="center" space="$2" opacity={disabled ? 0.4 : 1}>
+    <ScaleButton onPress={disabled ? undefined : onPress}>
       <View style={[
         styles.glassButton, 
-        isActive ? { backgroundColor: activeColor, borderColor: activeColor, shadowColor: glowColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 10, elevation: 5 } : { backgroundColor: 'rgba(255,255,255,0.1)' }
+        isActive ? { backgroundColor: activeColor, borderWidth: 2, borderColor: '#ffffff', elevation: 3 } : { backgroundColor: 'rgba(255,255,255,0.1)' }
       ]}>
         {icon}
       </View>
@@ -468,7 +372,7 @@ const styles = StyleSheet.create({
   darkOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.7)' },
   headerButton: { width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
   encryptionBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  avatarContainer: { width: 120, height: 120, justifyContent: 'center', alignItems: 'center', marginBottom: 20, position: 'relative' },
+  avatarContainer: { width: 140, height: 140, justifyContent: 'center', alignItems: 'center', marginBottom: 20, position: 'relative' },
   nameText: { color: '#fff', fontSize: 32, fontWeight: '700', letterSpacing: 0.5 },
   phoneText: { color: 'rgba(255,255,255,0.7)', fontSize: 18, marginTop: 4 },
   statusText: { color: 'rgba(255,255,255,0.9)', fontSize: 20, fontWeight: '400', marginTop: 12 },
@@ -476,8 +380,8 @@ const styles = StyleSheet.create({
   subtitleContainer: { marginTop: 20, paddingHorizontal: 20, paddingVertical: 16, borderRadius: TOKENS.RADIUS.LG, borderWidth: 1, borderColor: 'rgba(139, 92, 246, 0.4)', shadowColor: '#8b5cf6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
   controlsWrapper: { width: '100%', paddingHorizontal: 30 },
   bottomControls: { width: '100%', paddingHorizontal: 30 },
-  glassButton: { width: 64, height: 64, borderRadius: TOKENS.RADIUS.XL, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  endCallButton: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center', shadowColor: '#ef4444', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 15, elevation: 10 },
+  glassButton: { width: 68, height: 68, borderRadius: TOKENS.RADIUS.XL, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  endCallButton: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center', elevation: 6, borderWidth: 4, borderColor: 'rgba(239, 68, 68, 0.4)' },
   translationPill: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: TOKENS.RADIUS.XL },
   translationPillActive: { backgroundColor: '#005eb8' }
 });

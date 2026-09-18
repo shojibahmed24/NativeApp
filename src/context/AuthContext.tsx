@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
 
   const initApp = async () => {
     try {
@@ -29,6 +30,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       const res = await api.getProfile();
       setUser(res.user);
+      const seen = await AsyncStorage.getItem('has_seen_onboarding');
+      if (seen === 'true') setHasSeenOnboarding(true);
     registerForPushNotificationsAsync();
     registerForPushNotificationsAsync();
     } catch (err: any) {
@@ -46,11 +49,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initApp();
   }, []);
 
+  const checkUser = async (phone: string) => {
+    return await api.checkUser(phone);
+  };
+
   const loginWithPhone = async (phone: string, mode: string) => {
     return await api.requestOtp(phone, mode);
   };
 
-  const verifyOtp = async (phone: string, code: string) => {
+  const verifyOtp = async (phone: string, code: string, isRecovery: boolean = false) => {
     let currentDeviceId = deviceId;
     if (!currentDeviceId) {
       currentDeviceId = 'mobile_primary_session_' + Math.random().toString(36).substring(7);
@@ -58,6 +65,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setDeviceId(currentDeviceId);
     }
     const res = await api.verifyOtp(phone, code, currentDeviceId);
+    if (!res.isNewUser) {
+      // Existing user: set token and user
+      if (res.token) {
+        await api.setToken(res.token);
+      }
+      if (res.user) {
+        setUser(res.user);
+        setSessionError(null);
+      }
+    }
+    // New user: don't set anything, let setup-profile handle it
+    return res;
+  };
+
+  const registerWithPassword = async (phone: string, name: string, password: string, registrationToken: string) => {
+    let currentDeviceId = deviceId;
+    if (!currentDeviceId) {
+      currentDeviceId = 'mobile_primary_session_' + Math.random().toString(36).substring(7);
+      await AsyncStorage.setItem('unicom_dev_id', currentDeviceId);
+      setDeviceId(currentDeviceId);
+    }
+    const res = await api.registerWithPassword(phone, name, password, registrationToken, currentDeviceId);
+    await api.setToken(res.token);
+    setUser(res.user);
+    setSessionError(null);
+    return res;
+  };
+
+  const loginWithPassword = async (phone: string, password: string) => {
+    let currentDeviceId = deviceId;
+    if (!currentDeviceId) {
+      currentDeviceId = 'mobile_primary_session_' + Math.random().toString(36).substring(7);
+      await AsyncStorage.setItem('unicom_dev_id', currentDeviceId);
+      setDeviceId(currentDeviceId);
+    }
+    const res = await api.loginWithPassword(phone, password, currentDeviceId);
     await api.setToken(res.token);
     setUser(res.user);
     setSessionError(null);
@@ -102,8 +145,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loading,
         sessionError,
         deviceId,
+        checkUser,
         loginWithPhone,
         verifyOtp,
+        registerWithPassword,
+        loginWithPassword,
         loginWithFirebase,
         updateUserProfile,
         logout,

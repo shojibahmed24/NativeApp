@@ -177,8 +177,7 @@ export default function MyProfileScreen() {
   const [privacyModal, setPrivacyModal] = useState<{ visible: boolean; type: string }>({ visible: false, type: '' });
   const [languageModal, setLanguageModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
-  const [isUploadingWallpaper, setIsUploadingWallpaper] = useState(false);
-
+  
   const [newName, setNewName] = useState(user?.name || '');
   const [newBio, setNewBio] = useState(user?.status || 'Hey there! I am using UNICOM.');
   const [nativeLanguage, setNativeLanguage] = useState(user?.language || 'en');
@@ -501,12 +500,6 @@ export default function MyProfileScreen() {
                 icon={<Globe />} iconColors={['#38bdf8', '#0ea5e9']}
                 label="Native Language" subtitle={LANGS[nativeLanguage] || 'English'}
                 onPress={() => setLanguageModal(true)}
-              />
-              <SettingRow
-                icon={<ImageIcon />} iconColors={['#38bdf8', '#0ea5e9']}
-                label="Chat Wallpaper" subtitle={isUploadingWallpaper ? 'Uploading...' : 'Customize chat background'}
-                onPress={pickAndUploadWallpaper}
-                rightElement={isUploadingWallpaper ? <ActivityIndicator color="#0ea5e9" /> : undefined}
               />
               <SettingRow
                 icon={<CreditCard />} iconColors={['#38bdf8', '#0ea5e9']}

@@ -1,8 +1,25 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MMKV } from 'react-native-mmkv';
 import { Platform } from 'react-native';
-const storage = Platform.OS === 'web' ? { set: (k,v) => { try { window.localStorage.setItem(k, v) } catch(e){} }, getString: (k) => { try { return window.localStorage.getItem(k) } catch(e){ return null; } }, delete: (k) => { try { window.localStorage.removeItem(k) } catch(e){} } } : new MMKV();
+
+// MMKV requires NitroModules native code - not available in Expo Go
+let storage: any;
+if (Platform.OS === 'web') {
+  storage = { set: (k: string, v: string) => { try { window.localStorage.setItem(k, v) } catch(e){} }, getString: (k: string) => { try { return window.localStorage.getItem(k) } catch(e){ return null; } }, delete: (k: string) => { try { window.localStorage.removeItem(k) } catch(e){} } };
+} else {
+  try {
+    const { MMKV } = require('react-native-mmkv');
+    storage = new MMKV();
+  } catch (e) {
+    // Fallback for Expo Go where MMKV/NitroModules is not available
+    console.log('MMKV not available, using AsyncStorage fallback');
+    storage = {
+      set: (k: string, v: string) => { AsyncStorage.setItem(k, v).catch(() => {}); },
+      getString: (k: string) => { try { return null; } catch(e) { return null; } },
+      delete: (k: string) => { AsyncStorage.removeItem(k).catch(() => {}); },
+    };
+  }
+}
 import { supabase } from '../services/supabase';
 import { api } from '../services/api';
 import { useAuth } from './AuthContext';
@@ -63,24 +80,68 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     
     if (!socket) return;
-    const handleNewMessage = (newMsg) => {
+    const handleNewMessage = async (newMsg) => {
+      let decryptedText = newMsg.text || newMsg.content;
+      if (decryptedText) {
+         const { decryptMessage } = require('../utils/cryptoUtils');
+         // In 1:1 chat, we derive the shared secret using user.id and the peer's id.
+         // If we received this, the sender is peer, or it's our own message echoed back.
+         const peerId = (newMsg.senderId || newMsg.sender_id) === user.id ? newMsg.receiverId || (newMsg.chatId || newMsg.chat_id) : (newMsg.senderId || newMsg.sender_id);
+         decryptedText = await decryptMessage(decryptedText, user.id, peerId);
+      }
+
+      // Map to UI format
+      const mappedMsg = {
+        id: newMsg.id,
+        text: decryptedText,
+        time: new Date((newMsg.createdAt || newMsg.created_at) || newMsg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isSender: (newMsg.senderId || newMsg.sender_id) === user.id,
+        status: newMsg.status || 'delivered',
+        type: newMsg.mediaType || newMsg.type || 'text',
+        mediaUrl: newMsg.fileUrl || newMsg.mediaUrl || newMsg.media_url,
+        senderId: (newMsg.senderId || newMsg.sender_id),
+        metadata: typeof newMsg.metadata === 'string' ? (() => { try { return JSON.parse(newMsg.metadata); } catch(e) { return {}; } })() : (newMsg.metadata || {}),
+        reactions: newMsg.reactions || [],
+        createdAt: (newMsg.createdAt || newMsg.created_at) || newMsg.createdAt
+      };
+
       setMessages(prev => {
-          const chatId = newMsg.chat_id;
-          const chatMsgs = prev[chatId] || [];
-          if (chatMsgs.find(m => m.id === newMsg.id)) return prev;
-          const updatedMsgs = [...chatMsgs, newMsg].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); // sort desc
-          const updatedState = { ...prev, [chatId]: updatedMsgs };
+          const chatId = mappedMsg.isSender ? newMsg.receiverId || (newMsg.chatId || newMsg.chat_id) : mappedMsg.senderId;
+          // Fallback if we couldn't determine the peer ID properly
+          const finalChatId = chatId || (newMsg.chatId || newMsg.chat_id);
+          
+          const chatMsgs = prev[finalChatId] || [];
+          if (chatMsgs.find(m => m.id === mappedMsg.id)) return prev;
+          
+          const updatedMsgs = [...chatMsgs, mappedMsg].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()); // sort desc
+          const updatedState = { ...prev, [finalChatId]: updatedMsgs };
           storage.set('@chat_messages', JSON.stringify(updatedState));
           return updatedState;
-        });
+      });
+      
+      if ((newMsg.senderId || newMsg.sender_id) !== user.id) {
+        socket.emit('message:status_update', { messageId: newMsg.id, status: 'delivered' });
+      }
     };
     
     socket.on('message:received', handleNewMessage);
     
+    const handleStatusUpdate = ({ messageId, status }) => {
+      setMessages(prev => {
+        const newState = { ...prev };
+        for (const chatId in newState) {
+          newState[chatId] = newState[chatId].map(m => m.id === messageId ? { ...m, status } : m);
+        }
+        return newState;
+      });
+    };
+    socket.on('message:status_update', handleStatusUpdate);
+    
     return () => {
       socket.off('message:received', handleNewMessage);
+      socket.off('message:status_update', handleStatusUpdate);
     };
-  }, [user]);
+  }, [user, socket]);
   
   // Real-time Typing Status via Socket
   useEffect(() => {
@@ -93,8 +154,25 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     };
     
     socket.on('typing:status', handleTyping);
+    const handlePresenceChanged = ({ userId, status }) => {
+       setOnlineUsers(prev => ({ ...prev, [userId]: status === 'online' }));
+    };
+    const handlePresenceSync = ({ onlineUsers: activeIds }) => {
+       setOnlineUsers(prev => {
+          const newState = { ...prev };
+          activeIds.forEach(id => { newState[id] = true; });
+          return newState;
+       });
+    };
+    socket.on('user:presence_changed', handlePresenceChanged);
+    socket.on('user:presence_sync', handlePresenceSync);
+    socket.emit('user:join');
+
     return () => {
       socket.off('typing:status', handleTyping);
+      socket.off('user:presence_changed', handlePresenceChanged);
+      socket.off('user:presence_sync', handlePresenceSync);
+
     };
   }, [socket]);
 

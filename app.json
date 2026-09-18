@@ -21,16 +21,27 @@
       }
     },
     "android": {
+      "package": "com.unicom.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo-icon-transparent.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CONTACTS",
+        "android.permission.VIBRATE"
+      ]
     },
     "web": {
       "bundledJavaScript": true
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
+      "expo-audio",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc",
       [
         "expo-build-properties",
         {
@@ -38,9 +49,19 @@
             "useFrameworks": "static"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-asset"
     ],
     "scheme": "native-app",
-    "main": "expo-router/entry"
+    "main": "expo-router/entry",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8c1f7d28-c95f-4aab-b12c-8d43d61d4868"
+      }
+    },
+    "owner": "shojibahmed"
   }
 }

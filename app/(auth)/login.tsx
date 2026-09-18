@@ -3,6 +3,7 @@ import { View, Alert, TextInput, ActivityIndicator, TouchableOpacity, Text as RN
 import { YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useThemeContext } from '../../src/context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -34,6 +35,7 @@ export default function LoginScreen() {
   
   const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { isDark } = useThemeContext();
   const router = useRouter();
   const { loginWithPhone } = useAuth();
   
@@ -79,7 +81,7 @@ export default function LoginScreen() {
     <View style={styles.container}>
       {/* Deep Rich Gradient Background */}
       <LinearGradient
-        colors={TOKENS.GRADIENTS.PRIMARY_DARK}
+        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
         locations={[0, 0.5, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -87,8 +89,8 @@ export default function LoginScreen() {
       />
       
       {/* Background Blobs (No full screen BlurView so we keep the rich colors) */}
-      <View style={[styles.blob, styles.blob1]} />
-      <View style={[styles.blob, styles.blob2]} />
+      
+      
       
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -116,23 +118,23 @@ export default function LoginScreen() {
                     <ShieldCheck size={14} color="#005eb8" />
                     <RNText style={styles.badgeText}>End-to-End Encrypted</RNText>
                   </View>
-                  <RNText style={styles.tagline}>Premium Chat & Call Translation</RNText>
+                  <RNText style={[styles.tagline, { color: isDark ? '#ffffff' : '#0f172a', textShadowColor: isDark ? 'rgba(0,0,0,0.4)' : 'transparent' }]}>Premium Chat & Call Translation</RNText>
                 </Animated.View>
               </Animated.View>
 
               {/* Form Card */}
               <Animated.View entering={FadeInUp.duration(700).delay(500).springify()}>
-                <View style={styles.formCard}>
+                <View style={[styles.formCard, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}>
                   {/* Top floating accent */}
                   <View style={styles.cardAccent} />
                   
                   <View style={styles.inputSection}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                       <Phone size={14} color="#334155" style={{ marginRight: 6 }} />
-                      <RNText style={styles.label}>Phone Number</RNText>
+                      <RNText style={[styles.label, { color: isDark ? '#f8fafc' : '#334155' }]}>Phone Number</RNText>
                     </View>
                     
-                    <View style={[styles.inputContainer, isFocused && styles.inputFocused]}>
+                    <View style={[styles.inputContainer, isFocused && styles.inputFocused, { backgroundColor: isDark ? '#0f172a' : '#f8fafc', borderColor: isDark ? '#334155' : '#e2e8f0' }]}>
                       
                       {/* Interactive Country Chip */}
                       <TouchableOpacity 
@@ -147,7 +149,7 @@ export default function LoginScreen() {
                       </TouchableOpacity>
                       
                       <TextInput 
-                        style={styles.input}
+                        style={[styles.input, { color: isDark ? '#f8fafc' : '#0f172a' }]}
                         placeholder="1700000000" 
                         placeholderTextColor="#94a3b8"
                         value={phone}

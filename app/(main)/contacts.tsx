@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  ScrollView, TextInput, TouchableOpacity, View, Image, ActivityIndicator,
-  StyleSheet, RefreshControl, Platform, Alert, Pressable, TouchableHighlight
+import { TOKENS } from '../../src/theme/tokens';
+import { useThemeContext } from '../../src/context/ThemeContext';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  ScrollView, TextInput, TouchableOpacity, View, Image,
+  StyleSheet, RefreshControl, Platform, Alert, Pressable, TouchableHighlight, Dimensions, ActivityIndicator
 } from 'react-native';
 import { YStack, XStack, Text } from 'tamagui';
 import { Search, Phone, Video, UserPlus, Users, MessageSquare, Send, Quote, Settings, RefreshCw, X } from 'lucide-react-native';
@@ -10,19 +12,18 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { api } from '../../src/services/api';
 import { useCall } from '../../src/context/CallContext';
 import Animated, { 
-  FadeInDown, FadeInUp, ZoomIn, 
-  useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, withSequence,
-  Easing, interpolate
+  FadeInDown, FadeInUp, SlideInRight, ZoomIn, 
+  useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat,
+  Easing
 } from 'react-native-reanimated';
-import * as Contacts from 'expo-contacts';
+import * as Contacts from 'expo-contacts/legacy';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TOKENS } from '../../src/theme/tokens';
+import * as SMS from 'expo-sms';
 
-
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const AnimatedRefresh = Animated.createAnimatedComponent(RefreshCw);
 
 const AVATAR_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const getColor = (name: string) => {
@@ -51,29 +52,47 @@ const ScaleButton = ({ onPress, style, children, activeScale = 0.92, haptic = Ha
   );
 };
 
-const SyncButton = ({ syncing, onPress }: { syncing: boolean, onPress: () => void }) => {
-  const rotation = useSharedValue(0);
-
+// --- Animated Avatar Ring (reused) ---
+const AnimatedAvatarRing = ({ children, status }: { children: React.ReactNode, status: 'online' | 'offline' | 'non-unicom' }) => {
+  const ringRotation = useSharedValue(0);
+  
   useEffect(() => {
-    if (syncing) {
-      rotation.value = withRepeat(withTiming(360, { duration: 1000, easing: Easing.linear }), -1, false);
-    } else {
-      rotation.value = withTiming(0, { duration: 300 });
-    }
-  }, [syncing]);
+    ringRotation.value = withRepeat(
+      withTiming(360, { duration: status === 'online' ? 4000 : 6000, easing: Easing.linear }),
+      -1, false
+    );
+  }, []);
 
-  const style = useAnimatedStyle(() => ({ transform: [{ rotateZ: `${rotation.value}deg` }] }));
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${ringRotation.value}deg` }]
+  }));
+
+  const ringColors = status === 'online' 
+    ? ['#06d6a0', '#38bdf8', '#06d6a0'] 
+    : status === 'non-unicom' 
+      ? ['#f59e0b', '#f97316', '#f59e0b'] 
+      : ['#8b5cf6', '#c084fc', '#8b5cf6']; 
 
   return (
-    <ScaleButton onPress={onPress} style={styles.syncBtnSmall}>
-      <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-      <Animated.View style={[style, { zIndex: 1 }]}>
-        <RefreshCw color="#fff" size={20} />
+    <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={[{ position: 'absolute', width: 60, height: 60, borderRadius: 30 }, ringStyle]}>
+        <LinearGradient
+          colors={ringColors as [string, string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ width: 60, height: 60, borderRadius: 30 }}
+        />
       </Animated.View>
-    </ScaleButton>
+      <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 50, height: 50, borderRadius: 25, overflow: 'hidden' }}>
+          {children}
+        </View>
+      </View>
+    </View>
   );
 };
 
+// --- Online Pulse Dot ---
 const PulseDot = () => {
   const scale = useSharedValue(0.8);
   const opacity = useSharedValue(0.8);
@@ -81,61 +100,47 @@ const PulseDot = () => {
     scale.value = withRepeat(withTiming(1.5, { duration: 1500 }), -1, true);
     opacity.value = withRepeat(withTiming(0, { duration: 1500 }), -1, true);
   }, []);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: opacity.value }));
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }], opacity: opacity.value
+  }));
   return (
-    <View style={styles.onlineDotWrapper}>
-      <Animated.View style={[styles.onlineDotGlow, style]} />
-      <View style={styles.onlineDot} />
+    <View style={{ position: 'absolute', bottom: 1, right: 1, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' }}>
+      <Animated.View style={[{ position: 'absolute', width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', opacity: 0.6 }, style]} />
+      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#fff' }} />
     </View>
   );
 };
 
-const PulseGlow = () => {
-  const scale = useSharedValue(0.9);
-  const opacity = useSharedValue(0.5);
+// --- Loading Skeleton ---
+const SkeletonRow = ({ index }: { index: number }) => {
+  const shimmerOpacity = useSharedValue(0.4);
   useEffect(() => {
-    scale.value = withRepeat(withTiming(1.1, { duration: 1500 }), -1, true);
-    opacity.value = withRepeat(withTiming(0.2, { duration: 1500 }), -1, true);
+    shimmerOpacity.value = withRepeat(
+      withTiming(0.8, { duration: 800, easing: Easing.inOut(Easing.ease) }), 
+      -1, true
+    );
   }, []);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: opacity.value }));
-  return <Animated.View style={[styles.syncPrimaryBtnGlow, style]} />;
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: shimmerOpacity.value }));
+  return (
+    <Animated.View style={[animatedStyle, { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 24, padding: 16, marginHorizontal: 16, marginBottom: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' }]}>
+      <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(226,232,240,0.5)' }} />
+      <YStack flex={1} marginLeft="$3" space="$2">
+        <View style={{ width: 140, height: 16, borderRadius: 6, backgroundColor: 'rgba(226,232,240,0.5)' }} />
+        <View style={{ width: '70%', height: 14, borderRadius: 7, backgroundColor: 'rgba(241,245,249,0.5)' }} />
+      </YStack>
+    </Animated.View>
+  );
 };
 
+// --- Empty State ---
 const EmptyPulseIcon = ({ isError }: { isError: boolean }) => {
   const scale = useSharedValue(0.95);
   useEffect(() => { scale.value = withRepeat(withTiming(1.05, { duration: 2000 }), -1, true); }, []);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
-    <Animated.View style={[styles.emptyIconBadge, style]}>
+    <Animated.View style={[style, { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }]}>
       <LinearGradient colors={isError ? ['#fee2e2', '#ffedd5'] : ['#e0e7ff', '#fae8ff']} style={StyleSheet.absoluteFillObject} />
       <Users color={isError ? "#ef4444" : "#6366f1"} size={32} style={{ zIndex: 1 }} />
-    </Animated.View>
-  );
-};
-
-const SkeletonRow = ({ index }: { index: number }) => {
-  const translateX = useSharedValue(-200);
-  useEffect(() => { translateX.value = withRepeat(withTiming(400, { duration: 1200 }), -1, false); }, []);
-  const style = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
-  return (
-    <Animated.View entering={FadeInDown.delay(index * 40)} style={styles.contactRowSkeleton}>
-       <View style={[styles.avatar, {backgroundColor: '#e2e8f0', overflow: 'hidden'}]}>
-          <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
-            <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
-          </Animated.View>
-       </View>
-       <YStack flex={1} marginLeft="$3" space="$2" justifyContent="center">
-         <View style={{width: '40%', height: 16, backgroundColor: '#e2e8f0', borderRadius: TOKENS.RADIUS.SM, overflow: 'hidden'}}>
-            <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
-              <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
-            </Animated.View>
-         </View>
-         <View style={{width: '70%', height: 14, backgroundColor: '#f1f5f9', borderRadius: 7, overflow: 'hidden'}}>
-            <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
-              <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
-            </Animated.View>
-         </View>
-       </YStack>
     </Animated.View>
   );
 };
@@ -164,8 +169,7 @@ const InviteButton = ({ onInvite }: { onInvite: () => void }) => {
   }));
 
   return (
-    <ScaleButton onPress={handlePress} style={styles.inviteBtnWrapper}>
-      <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+    <ScaleButton onPress={handlePress} style={{ borderRadius: 12, backgroundColor: TOKENS.COLORS.SUCCESS, elevation: 2 }}>
       <XStack alignItems="center" space="$1.5" style={{ zIndex: 1, paddingHorizontal: 14, paddingVertical: 8 }}>
         <Animated.View style={iconStyle}>
           <Send color="#fff" size={14} />
@@ -176,19 +180,116 @@ const InviteButton = ({ onInvite }: { onInvite: () => void }) => {
   );
 };
 
+const FilterButton = ({ label, type, activeFilter, onSelect, gradientColors }: any) => {
+  const { isDark } = useThemeContext();
+  const isActive = activeFilter === type;
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.92, { damping: 15 });
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+    }
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15 });
+  };
+
+  const inactiveBorder = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
+  const inactiveBg = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)';
+  const inactiveText = isDark ? '#94a3b8' : '#475569';
+
+  return (
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={() => onSelect(type)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
+      <Animated.View
+        style={[
+          {
+            borderRadius: 20,
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderWidth: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'hidden',
+            borderColor: isActive ? gradientColors[0] : inactiveBorder,
+            backgroundColor: isActive ? 'transparent' : inactiveBg,
+          },
+          isActive && {
+            shadowColor: gradientColors[0],
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.5,
+            shadowRadius: 10,
+            elevation: 8,
+          },
+          animatedStyle
+        ]}
+      >
+        {isActive && (
+          <LinearGradient
+            colors={gradientColors}
+            start={{x:0,y:0}} end={{x:1,y:1}}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
+        <Text style={{
+          fontSize: 14,
+          fontWeight: isActive ? '700' : '600',
+          color: isActive ? '#ffffff' : inactiveText,
+          zIndex: 2,
+          letterSpacing: 0.3,
+        }}>
+          {label}
+        </Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
 export default function ContactsScreen() {
+  const { isDark } = useThemeContext();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { startVoiceCall } = useCall();
   const [contacts, setContacts] = useState<any[]>([]);
   const [nonUnicomContacts, setNonUnicomContacts] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [filter, setFilter] = useState('all');
+
+  // Background floating particles
+  const p1Y = useSharedValue(0);
+  const p2Y = useSharedValue(0);
+  const p3Y = useSharedValue(0);
+  const p4Y = useSharedValue(0);
+  const p5Y = useSharedValue(0);
+
+  useEffect(() => {
+    p1Y.value = withRepeat(withTiming(-20, { duration: 4000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p2Y.value = withRepeat(withTiming(25, { duration: 5000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p3Y.value = withRepeat(withTiming(-30, { duration: 6000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p4Y.value = withRepeat(withTiming(15, { duration: 4500, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p5Y.value = withRepeat(withTiming(-25, { duration: 5500, easing: Easing.inOut(Easing.ease) }), -1, true);
+  }, []);
+
+  const p1Style = useAnimatedStyle(() => ({ transform: [{ translateY: p1Y.value }] }));
+  const p2Style = useAnimatedStyle(() => ({ transform: [{ translateY: p2Y.value }] }));
+  const p3Style = useAnimatedStyle(() => ({ transform: [{ translateY: p3Y.value }] }));
+  const p4Style = useAnimatedStyle(() => ({ transform: [{ translateY: p4Y.value }] }));
+  const p5Style = useAnimatedStyle(() => ({ transform: [{ translateY: p5Y.value }] }));
 
   const loadContacts = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -253,11 +354,26 @@ export default function ContactsScreen() {
   useEffect(() => { loadContacts(); }, []);
 
   useEffect(() => {
-    if (!search.trim()) { setFiltered([...contacts, ...nonUnicomContacts]); return; }
-    const q = search.toLowerCase();
-    const all = [...contacts, ...nonUnicomContacts];
-    setFiltered(all.filter(c => (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)));
-  }, [search, contacts, nonUnicomContacts]);
+    let result = [...contacts, ...nonUnicomContacts];
+    
+    // Apply category filter
+    if (filter === 'online') {
+      result = result.filter(c => !c.isNonUnicom && c.onlineStatus === 'online');
+    } else if (filter === 'non-unicom') {
+      result = result.filter(c => c.isNonUnicom);
+    }
+    
+    // Apply search filter
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(c => 
+        (c.name || '').toLowerCase().includes(q) || 
+        (c.phone || '').includes(q)
+      );
+    }
+    
+    setFiltered(result);
+  }, [search, contacts, nonUnicomContacts, filter]);
 
   const handleCall = async (contact: any) => {
     if (contact.isNonUnicom) {
@@ -267,228 +383,332 @@ export default function ContactsScreen() {
     router.push(`/chat/${contact.id}`);
   };
 
+  const handleInvite = async (phone: string) => {
+    const message = "Let's chat on UNICOM! Download the app: https://unicom.app";
+    try {
+      const isAvailable = await SMS.isAvailableAsync();
+      if (isAvailable) {
+        await SMS.sendSMSAsync([phone], message);
+      } else {
+        const { Share } = require('react-native');
+        Share.share({ message: message });
+      }
+    } catch(e) {
+      console.log('Error opening SMS:', e);
+    }
+  };
+
   const initial = (name: string) => (name || '?').charAt(0).toUpperCase();
 
-  const searchScale = useSharedValue(1);
-  const searchAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: searchScale.value }],
-    shadowColor: isSearchFocused ? '#005eb8' : '#64748b',
-    shadowOpacity: isSearchFocused ? 0.2 : 0.08,
-    shadowRadius: isSearchFocused ? 12 : 8,
-    elevation: isSearchFocused ? 6 : 2,
-    borderColor: isSearchFocused ? 'rgba(0, 94, 184, 0.3)' : '#e2e8f0',
-  }));
+  const handleFilterChange = (newFilter: string) => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    setFilter(newFilter);
+  };
 
-  useEffect(() => {
-    searchScale.value = withTiming(isSearchFocused ? 1.02 : 1, { duration: 200 });
-  }, [isSearchFocused]);
+  const renderRow = (contact: any, index: number) => {
+    const name = contact.name || 'Unknown';
+    const isNonUnicom = contact.isNonUnicom;
+    const avatarBg = isNonUnicom ? '#94a3b8' : getColor(name);
+    const isOnline = contact.onlineStatus === 'online';
+    const avatarStatus = isOnline ? 'online' : isNonUnicom ? 'non-unicom' : 'offline';
 
-  if (loading) {
     return (
-      <View style={styles.container}>
-        <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={styles.header}>
-            <Text style={styles.appTitle}>Contacts</Text>
-            <SyncButton syncing={true} onPress={() => {}} />
+      <Animated.View key={contact.id ? contact.id + "-" + index : index} entering={SlideInRight.delay(index * 60).springify().damping(15)} style={[styles.cardContainer, isNonUnicom && styles.cardContainerNonUnicom]}>
+        <LinearGradient 
+          colors={isDark ? ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)'] : ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']} 
+          start={{x:0, y:0}} end={{x:0, y:1}} style={StyleSheet.absoluteFillObject} />
+        
+        <TouchableHighlight
+          style={styles.rowInner}
+          underlayColor="rgba(255,255,255,0.05)"
+          onPress={() => handleCall(contact)}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            {/* Animated Avatar */}
+            <View style={{ position: 'relative' }}>
+              <AnimatedAvatarRing status={avatarStatus}>
+                {contact.avatar && !isNonUnicom ? (
+                  <Image source={{ uri: contact.avatar }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                ) : (
+                  <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: avatarBg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text color="#fff" fontWeight="900" fontSize={20}>{initial(name)}</Text>
+                  </View>
+                )}
+              </AnimatedAvatarRing>
+              {isOnline && !isNonUnicom && <PulseDot />}
+            </View>
+
+            {/* Content */}
+            <YStack flex={1} marginLeft="$3">
+              <Text fontWeight={isNonUnicom ? "600" : "800"} fontSize={16} color={isDark ? (isNonUnicom ? "#94a3b8" : "#f1f5f9") : (isNonUnicom ? "#94a3b8" : "#0f172a")}>{name}</Text>
+              
+              <XStack alignItems="center" marginTop={2} space="$1">
+                {(!isNonUnicom && contact.about && contact.about !== contact.phone) && <Quote size={10} color="#94a3b8" />}
+                <Text fontSize={13} color="#64748b" fontStyle={(!isNonUnicom && contact.about && contact.about !== contact.phone) ? 'italic' : 'normal'}>
+                  {contact.about || contact.phone || 'UNICOM user'}
+                </Text>
+              </XStack>
+              
+              {isNonUnicom && (
+                <Text fontSize={11} color="#64748b" marginTop={1} fontWeight="500">Not on UNICOM yet</Text>
+              )}
+            </YStack>
+
+            {/* Action Buttons */}
+            <XStack space="$2">
+              {isNonUnicom ? (
+                <InviteButton onInvite={() => handleInvite(contact.phone)} />
+              ) : (
+                <ScaleButton 
+                  style={styles.chatBtnWrapper} 
+                  onPress={() => router.push(`/chat/${contact.id}`)}
+                >
+                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={{ width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
+                      <MessageSquare color="#fff" size={18} />
+                    </LinearGradient>
+                </ScaleButton>
+              )}
+            </XStack>
           </View>
-          <View style={styles.searchContainer}>
-            <View style={[styles.searchBar, { backgroundColor: '#fff', borderColor: '#e2e8f0', shadowOpacity: 0.05 }]} />
-          </View>
-          <View style={{flex: 1}}>
-            {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonRow key={i} index={i} />)}
-          </View>
-        </SafeAreaView>
-      </View>
+        </TouchableHighlight>
+      </Animated.View>
     );
-  }
+  };
+
+  const styles = getStyles(isDark);
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
-      <SafeAreaView style={{ flex: 1 }}>
-        <Animated.View entering={FadeInDown.duration(400)}>
-          <View style={styles.header}>
-            <Text style={styles.appTitle}>Contacts</Text>
-            <SyncButton syncing={syncing} onPress={() => loadContacts(true)} />
-          </View>
+      {/* === FULL-SCREEN THEME-ADAPTIVE GRADIENT (Option A — Clean) === */}
+      <LinearGradient
+        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
+        locations={[0, 0.5, 1]}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
 
-          <View style={styles.searchContainer}>
-            <Animated.View style={[styles.searchBar, searchAnimatedStyle]}>
-              <Search color={isSearchFocused ? "#005eb8" : "#94a3b8"} size={18} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search contacts..."
-                placeholderTextColor="#94a3b8"
-                value={search}
-                onChangeText={setSearch}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setIsSearchFocused(false)}
-              />
-              {search.length > 0 && (
-                <Animated.View entering={FadeInDown.duration(200)}>
-                  <TouchableOpacity onPress={() => setSearch('')} style={styles.clearBtn} activeOpacity={0.6}>
-                    <X color={TOKENS.COLORS.TEXT_SECONDARY} size={16} />
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
-            </Animated.View>
+      {/* Background Particles */}
+      <View style={[StyleSheet.absoluteFillObject, { zIndex: 1, pointerEvents: 'none' }]}>
+        <Animated.View style={[styles.particle, { backgroundColor: '#8b5cf6', top: 380, left: 20, width: 8, height: 8 }, p1Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#06b6d4', top: 580, right: 30, width: 12, height: 12 }, p2Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#ec4899', top: 780, left: 40, width: 6, height: 6 }, p3Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#3b82f6', top: 480, right: 60, width: 9, height: 9 }, p4Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#a855f7', top: 680, left: 80, width: 10, height: 10 }, p5Style]} />
+      </View>
+
+      {/* Top Fixed Section */}
+      <View style={{ paddingTop: insets.top + 10, zIndex: 10, paddingBottom: 10 }}>
+        {/* Search Bar */}
+        <XStack paddingHorizontal="$4" marginBottom="$4">
+          <View style={[styles.searchContainer, { 
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+            borderColor: isSearchFocused ? (isDark ? '#38bdf8' : '#0ea5e9') : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'),
+            borderWidth: 1.5,
+            shadowColor: isSearchFocused ? (isDark ? '#38bdf8' : '#0ea5e9') : (isDark ? '#000' : '#64748b'),
+            shadowOffset: { width: 0, height: isSearchFocused ? 6 : 4 },
+            shadowOpacity: isSearchFocused ? (isDark ? 0.3 : 0.2) : (isDark ? 0 : 0.1),
+            shadowRadius: isSearchFocused ? 16 : 12,
+            elevation: isDark ? 0 : 4,
+          }]}>
+            <Image source={require('../../assets/images/logo-icon-transparent.png')} style={{ width: 28, height: 28, marginLeft: 16 }} />
+            <TextInput
+              style={[styles.searchInput, { color: isDark ? '#fff' : '#1e293b' }, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
+              placeholder="Search contacts..."
+              placeholderTextColor={isDark ? "#94a3b8" : "#64748b"}
+              value={search}
+              onChangeText={setSearch}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity onPress={() => setSearch('')} style={{ marginRight: 6 }}>
+              <LinearGradient colors={['#38bdf8', '#818cf8']} style={styles.searchIconBtn}>
+                {search.length > 0 ? <X color="#fff" size={18} /> : <Search color="#fff" size={18} />}
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
+        </XStack>
+
+        {/* Filter Pills */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+          <FilterButton label="All" type="all" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#0ea5e9', '#3b82f6']} />
+          <FilterButton label="Online" type="online" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#06d6a0', '#0ea5e9']} />
+          <FilterButton label="Non-Unicom" type="non-unicom" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#f59e0b', '#f97316']} />
+        </ScrollView>
+      </View>
+
+      {/* Main Content */}
+      {loading ? (
+        <View style={{ paddingTop: 16 }}>
+          {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} index={i} />)}
+        </View>
+      ) : permissionDenied && filtered.length === 0 ? (
+        <Animated.View entering={FadeInUp.delay(200)} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: -40, zIndex: 5 }}>
+          <EmptyPulseIcon isError={true} />
+          <Text fontSize={22} fontWeight="800" color={isDark ? "#f1f5f9" : "#0f172a"} marginTop="$5">Contacts Access Denied</Text>
+          <Text fontSize={15} color={isDark ? "#94a3b8" : "#64748b"} marginTop="$2" textAlign="center" paddingHorizontal="$4" lineHeight={22}>
+            Please enable contacts permission in your settings to easily find friends on UNICOM.
+          </Text>
+          <TouchableOpacity onPress={() => Linking.openSettings()} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16, borderWidth: 1.5, borderColor: '#38bdf8', marginTop: 24, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(14,165,233,0.1)' }}>
+            <Settings color="#0ea5e9" size={18} />
+            <Text color="#0ea5e9" fontWeight="700" marginLeft="$2">Open Settings</Text>
+          </TouchableOpacity>
         </Animated.View>
-
-        {permissionDenied && filtered.length === 0 ? (
-          <Animated.View entering={FadeInUp.delay(200)} style={styles.emptyState}>
-            <EmptyPulseIcon isError={true} />
-            <Text fontSize={22} fontWeight="800" color={TOKENS.COLORS.TEXT_PRIMARY} marginTop="$5">Contacts Access Denied</Text>
-            <Text fontSize={15} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop="$2" textAlign="center" paddingHorizontal="$4" lineHeight={22}>
-              Please enable contacts permission in your settings to easily find friends on UNICOM.
-            </Text>
-            <ScaleButton onPress={() => Linking.openSettings()} style={styles.settingsBtn}>
-              <Settings color="#005eb8" size={18} />
-              <Text color="#005eb8" fontWeight="700" marginLeft="$2">Open Settings</Text>
-            </ScaleButton>
-          </Animated.View>
-        ) : filtered.length === 0 ? (
-          <Animated.View entering={FadeInUp.delay(200)} style={styles.emptyState}>
-            <EmptyPulseIcon isError={false} />
-            <Text fontSize={22} fontWeight="800" color={TOKENS.COLORS.TEXT_PRIMARY} marginTop="$5">
-              {search ? 'No results found' : 'No UNICOM contacts'}
-            </Text>
-            <Text fontSize={15} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop="$2" textAlign="center" paddingHorizontal="$4" lineHeight={22}>
-              {search ? `We couldn't find any contacts matching "${search}"` : 'Your phone contacts who use UNICOM will appear here.'}
-            </Text>
-            {!search && (
-              <ScaleButton onPress={() => loadContacts(true)} style={styles.syncPrimaryBtn}>
-                <PulseGlow />
-                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 1 }}>
-                  <UserPlus color="#fff" size={18} />
-                  <Text color="#fff" fontWeight="800" marginLeft="$2">Sync Contacts</Text>
-                </View>
-              </ScaleButton>
-            )}
-          </Animated.View>
-        ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadContacts(true)} tintColor="#005eb8" />}
-            contentContainerStyle={{ paddingBottom: Math.max((insets?.bottom || 0) + 120, 140) }}
-          >
-            <View style={styles.countBadgeWrapper}>
-              <View style={styles.countBadge}>
-                <View style={styles.countBadgeDot} />
-                <Text style={styles.countBadgeText}>{contacts.length} UNICOM contact{contacts.length !== 1 ? 's' : ''}</Text>
-              </View>
+      ) : filtered.length === 0 ? (
+        <Animated.View entering={FadeInUp.delay(200)} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: -40, zIndex: 5 }}>
+          <EmptyPulseIcon isError={false} />
+          <Text fontSize={22} fontWeight="800" color={isDark ? "#f1f5f9" : "#0f172a"} marginTop="$5">
+            {search ? 'No results found' : filter === 'online' ? 'No one is online' : filter === 'non-unicom' ? 'Everyone is on UNICOM!' : 'No contacts'}
+          </Text>
+          <Text fontSize={15} color={isDark ? "#94a3b8" : "#64748b"} marginTop="$2" textAlign="center" paddingHorizontal="$4" lineHeight={22}>
+            {search ? `We couldn't find any contacts matching "${search}"` : 'Your phone contacts who use UNICOM will appear here.'}
+          </Text>
+        </Animated.View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1, zIndex: 5 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadContacts(true)} tintColor="#6366f1" />}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 100 }}
+        >
+          {/* Glassmorphic Count Badge */}
+          <View style={{ alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', shadowColor: '#38bdf8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#0ea5e9', marginRight: 6 }} />
+              <Text style={{ fontSize: 12, color: '#0ea5e9', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {contacts.length} UNICOM contact{contacts.length !== 1 ? 's' : ''}
+              </Text>
             </View>
+          </View>
 
-            {filtered.map((contact, index) => {
-              const name = contact.name || 'Unknown';
-              const isNonUnicom = contact.isNonUnicom;
-              const avatarBg = isNonUnicom ? '#94a3b8' : getColor(name);
-              const isOnline = contact.onlineStatus === 'online';
+          {filtered.map((contact, index) => renderRow(contact, index))}
+        </ScrollView>
+      )}
 
-              return (
-                <Animated.View key={contact.id || index} entering={FadeInUp.delay(index * 60)}>
-                  <TouchableHighlight
-                    style={[styles.contactRow, isNonUnicom && styles.nonUnicomRow]}
-                    underlayColor={isNonUnicom ? "#f1f5f9" : "#e2e8f0"}
-                    onPress={() => handleCall(contact)}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                      <View style={styles.avatarWrapper}>
-                        {contact.avatar && !isNonUnicom ? (
-                          <Image source={{ uri: contact.avatar }} style={styles.avatar} />
-                        ) : (
-                          <View style={[styles.avatar, { backgroundColor: avatarBg, alignItems: 'center', justifyContent: 'center' }]}>
-                            <Text color="#fff" fontWeight="900" fontSize={20} style={{ zIndex: 1 }}>{initial(name)}</Text>
-                          </View>
-                        )}
-                        {isOnline && !isNonUnicom && <PulseDot />}
-                      </View>
 
-                      <YStack flex={1} marginLeft="$3">
-                        <Text fontWeight={isNonUnicom ? "600" : "800"} fontSize={16} color={isNonUnicom ? "#475569" : "#0f172a"}>{name}</Text>
-                        
-                        <XStack alignItems="center" marginTop={2} space="$1">
-                          {(!isNonUnicom && contact.about && contact.about !== contact.phone) && <Quote size={10} color={TOKENS.COLORS.TEXT_SECONDARY} />}
-                          <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontStyle={(!isNonUnicom && contact.about && contact.about !== contact.phone) ? 'italic' : 'normal'}>
-                            {contact.about || contact.phone || 'UNICOM user'}
-                          </Text>
-                        </XStack>
-                        
-                        {isNonUnicom && (
-                          <Text fontSize={11} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop={1} fontWeight="500">Not on UNICOM yet</Text>
-                        )}
-                      </YStack>
-
-                      <XStack space="$2" alignItems="center">
-                        {isNonUnicom ? (
-                          <InviteButton onInvite={() => Linking.openURL(`sms:${contact.phone}?body=Let's chat on UNICOM! Download the app: https://unicom.app`)} />
-                        ) : (
-                          <>
-                            <TouchableOpacity 
-                              style={styles.callBtn}
-                              onPress={() => { startVoiceCall(contact.id, contact.name, false); router.push('/call/' + contact.id); }}
-                            >
-                              <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-                              <View style={{ zIndex: 1 }}><Phone color="#fff" size={18} /></View>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                              style={styles.callBtn}
-                              onPress={() => { startVoiceCall(contact.id, contact.name, true); router.push('/call/' + contact.id); }}
-                            >
-                              <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-                              <View style={{ zIndex: 1 }}><Video color="#fff" size={18} /></View>
-                            </TouchableOpacity>
-                            <ScaleButton 
-                              style={styles.chatBtnWrapper} 
-                              onPress={() => router.push(`/chat/${contact.id}`)}
-                            >
-                              <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-                              <View style={{ zIndex: 1 }}><MessageSquare color="#fff" size={18} /></View>
-                            </ScaleButton>
-                          </>
-                        )}
-                      </XStack>
-                    </View>
-                  </TouchableHighlight>
-                </Animated.View>
-              );
-            })}
-          </ScrollView>
-        )}
-      </SafeAreaView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  appTitle: { fontSize: 28, fontWeight: '900', color: '#005eb8', letterSpacing: -0.5 },
-  syncBtnSmall: { width: 40, height: 40, borderRadius: TOKENS.RADIUS.LG, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
-  searchContainer: { marginHorizontal: 16, marginBottom: 16 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, height: 46, borderRadius: 23, gap: 10, borderWidth: 1.5 },
-  searchInput: { flex: 1, fontSize: 16, color: '#0f172a', fontWeight: '500', outlineStyle: 'none' } as any,
-  clearBtn: { width: 24, height: 24, borderRadius: TOKENS.RADIUS.MD, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
-  contactRow: { paddingVertical: 14, paddingHorizontal: 20, backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: TOKENS.RADIUS.LG, ...TOKENS.SHADOWS.SUBTLE },
-  nonUnicomRow: { backgroundColor: 'rgba(251, 191, 36, 0.05)', shadowOpacity: 0.02 },
-  contactRowSkeleton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: TOKENS.RADIUS.LG, ...TOKENS.SHADOWS.SUBTLE },
-  avatarWrapper: { position: 'relative', width: 56, height: 56 },
-  avatar: { width: 56, height: 56, borderRadius: TOKENS.RADIUS.XL, borderWidth: 2, borderColor: '#fff', ...TOKENS.SHADOWS.ELEVATED },
-  onlineDotWrapper: { position: 'absolute', bottom: 1, right: 1, width: 16, height: 16, justifyContent: 'center', alignItems: 'center', zIndex: 2 },
-  onlineDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#fff' },
-  onlineDotGlow: { position: 'absolute', width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', opacity: 0.6 },
-  callBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  chatBtnWrapper: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  inviteBtnWrapper: { borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: -40 },
-  emptyIconBadge: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
-  settingsBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: TOKENS.RADIUS.LG, borderWidth: 1.5, borderColor: '#005eb8', marginTop: 24 },
-  syncPrimaryBtn: { borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', marginTop: 24, paddingHorizontal: 24, paddingVertical: 14 },
-  syncPrimaryBtnGlow: { position: 'absolute', top: -10, left: -10, right: -10, bottom: -10, backgroundColor: '#6366f1', opacity: 0.5, borderRadius: TOKENS.RADIUS.XL },
-  countBadgeWrapper: { alignItems: 'center', marginBottom: 16 },
-  countBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e0f2fe', paddingHorizontal: 12, paddingVertical: 6, borderRadius: TOKENS.RADIUS.MD },
-  countBadgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#0284c7', marginRight: 6 },
-  countBadgeText: { fontSize: 11, color: '#0284c7', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-});
+function getStyles(isDark: boolean) { return StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: isDark ? '#0f172a' : '#f0f4ff',
+  },
+  headerGradientAbsolute: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 220,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+    zIndex: 0,
+  },
+  star: {
+    position: 'absolute',
+    width: 3,
+    height: 3,
+    backgroundColor: '#38bdf8',
+    borderRadius: 3,
+    opacity: 0.7,
+    shadowColor: '#38bdf8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+  },
+  searchContainer: {
+    flex: 1,
+    height: 56,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  searchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+    paddingHorizontal: 12,
+  },
+  searchIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 100,
+  },
+  cardContainer: {
+    marginBottom: 12,
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : (isDark ? '#1e293b' : '#ffffff'),
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(199,210,254,0.7)',
+    overflow: 'hidden',
+    shadowColor: isDark ? '#06b6d4' : '#818cf8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: isDark ? 0.25 : 0.18,
+    shadowRadius: 20,
+    elevation: Platform.OS === 'web' ? 8 : 2,
+  },
+  cardContainerNonUnicom: {
+    /* opacity: 0.85 */
+    backgroundColor: isDark ? '#161e2e' : '#f8fafc',
+    borderColor: isDark ? '#334155' : '#e2e8f0',
+  },
+  rowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    backgroundColor: 'transparent',
+  },
+  chatBtnWrapper: {
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  particle: {
+    position: 'absolute',
+    borderRadius: 99,
+    opacity: 0.5,
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    zIndex: 20,
+  },
+  fabOuter: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#06b6d4',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  fabInner: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+}); }

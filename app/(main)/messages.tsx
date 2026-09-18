@@ -1,22 +1,24 @@
+import { TOKENS } from '../../src/theme/tokens';
+import { useThemeContext } from '../../src/context/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
-import {
+import { 
   ScrollView, TextInput, TouchableOpacity, TouchableHighlight, View, Image,
-  StyleSheet, RefreshControl, Platform, Alert, Animated as RNAnimated
+  StyleSheet, RefreshControl, Platform, Alert, Animated as RNAnimated, Dimensions
 } from 'react-native';
 import { YStack, XStack, Text } from 'tamagui';
-import { Search, Edit, Archive, Trash2, MessageSquare, Image as ImageIcon, Mic, FileText, X } from 'lucide-react-native';
+import { Search, Edit, Archive, Trash2, MessageSquare, Image as ImageIcon, Mic, FileText, X, ArrowLeft } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useCall } from '../../src/context/CallContext';
 import { decryptMessage } from '../../src/utils/cryptoUtils';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import { api } from '../../src/services/api';
-import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, withRepeat, withTiming } from 'react-native-reanimated';
-import { GradientBackground } from '../../src/components/ThemeComponents';
+import Animated, { FadeInDown, FadeInUp, SlideInRight, useSharedValue, useAnimatedStyle, withSpring, withRepeat, withTiming, Easing } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { TOKENS } from '../../src/theme/tokens';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const AVATAR_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 const getColor = (name: string) => {
@@ -36,48 +38,70 @@ const formatTime = (dateStr: string) => {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-const getLastMessagePreview = (lastMessage: any) => {
-  if (!lastMessage) return <Text style={styles.msgText} numberOfLines={1}>No messages yet</Text>;
+const getLastMessagePreview = (lastMessage: any, isDark?: boolean) => {
+  if (!lastMessage) return <Text style={{ fontSize: 14, color: isDark ? '#94a3b8' : '#475569', fontWeight: '500' }} numberOfLines={1}>No messages yet</Text>;
   if (lastMessage.mediaType === 'image') return (
     <XStack space="$1.5" alignItems="center">
-      <View style={[styles.chipBase, { backgroundColor: '#e0f2fe' }]}><ImageIcon size={10} color="#0284c7" /></View>
-      <Text style={styles.msgText}>Photo</Text>
+      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' }}><ImageIcon size={10} color="#0284c7" /></View>
+      <Text style={{ fontSize: 14, color: isDark ? '#94a3b8' : '#475569', fontWeight: '500' }}>Photo</Text>
     </XStack>
   );
   if (lastMessage.mediaType === 'audio') return (
     <XStack space="$1.5" alignItems="center">
-      <View style={[styles.chipBase, { backgroundColor: '#f3e8ff' }]}><Mic size={10} color="#9333ea" /></View>
-      <Text style={styles.msgText}>Voice message</Text>
+      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#f3e8ff', alignItems: 'center', justifyContent: 'center' }}><Mic size={10} color="#9333ea" /></View>
+      <Text style={{ fontSize: 14, color: isDark ? '#94a3b8' : '#475569', fontWeight: '500' }}>Voice message</Text>
     </XStack>
   );
   if (lastMessage.mediaType === 'document') return (
     <XStack space="$1.5" alignItems="center">
-      <View style={[styles.chipBase, { backgroundColor: '#ffedd5' }]}><FileText size={10} color="#ea580c" /></View>
-      <Text style={styles.msgText}>Document</Text>
+      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#ffedd5', alignItems: 'center', justifyContent: 'center' }}><FileText size={10} color="#ea580c" /></View>
+      <Text style={{ fontSize: 14, color: isDark ? '#94a3b8' : '#475569', fontWeight: '500' }}>Document</Text>
     </XStack>
   );
-  return <Text style={styles.msgText} numberOfLines={1}>{lastMessage.text || 'Message'}</Text>;
+  return <Text style={{ fontSize: 14, color: isDark ? '#94a3b8' : '#475569', fontWeight: '500' }} numberOfLines={1}>{lastMessage.text || 'Message'}</Text>;
 };
 
-const ScaleButton = ({ onPress, style, children }: any) => {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+// --- Animated Avatar Ring (reused from Calls) ---
+const AnimatedAvatarRing = ({ children, status }: { children: React.ReactNode, status: 'online' | 'unread' | 'offline' }) => {
+  const ringRotation = useSharedValue(0);
+  
+  useEffect(() => {
+    ringRotation.value = withRepeat(
+      withTiming(360, { duration: status === 'online' ? 4000 : 6000, easing: Easing.linear }),
+      -1, false
+    );
+  }, []);
+
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${ringRotation.value}deg` }]
+  }));
+
+  const ringColors = status === 'online' 
+    ? ['#06d6a0', '#38bdf8', '#06d6a0'] 
+    : status === 'unread' 
+      ? ['#f59e0b', '#ef4444', '#f59e0b'] 
+      : ['#8b5cf6', '#c084fc', '#8b5cf6']; 
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPressIn={() => { scale.value = withSpring(0.92, { damping: 15 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 15 }); }}
-      onPress={() => {
-        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress?.();
-      }}
-      style={style}
-    >
-      <Animated.View style={animatedStyle}>{children}</Animated.View>
-    </TouchableOpacity>
+    <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={[{ position: 'absolute', width: 60, height: 60, borderRadius: 30 }, ringStyle]}>
+        <LinearGradient
+          colors={ringColors as [string, string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ width: 60, height: 60, borderRadius: 30 }}
+        />
+      </Animated.View>
+      <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 50, height: 50, borderRadius: 25, overflow: 'hidden' }}>
+          {children}
+        </View>
+      </View>
+    </View>
   );
 };
 
+// --- Online Pulse Dot ---
 const PulseDot = () => {
   const scale = useSharedValue(0.8);
   const opacity = useSharedValue(0.8);
@@ -89,13 +113,35 @@ const PulseDot = () => {
     transform: [{ scale: scale.value }], opacity: opacity.value
   }));
   return (
-    <View style={styles.onlineDotWrapper}>
-      <Animated.View style={[styles.onlineDotGlow, style]} />
-      <View style={styles.onlineDot} />
+    <View style={{ position: 'absolute', bottom: 1, right: 1, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' }}>
+      <Animated.View style={[{ position: 'absolute', width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', opacity: 0.6 }, style]} />
+      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#fff' }} />
     </View>
   );
 };
 
+// --- Loading Skeleton ---
+const SkeletonRow = ({ index }: { index: number }) => {
+  const shimmerOpacity = useSharedValue(0.4);
+  useEffect(() => {
+    shimmerOpacity.value = withRepeat(
+      withTiming(0.8, { duration: 800, easing: Easing.inOut(Easing.ease) }), 
+      -1, true
+    );
+  }, []);
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: shimmerOpacity.value }));
+  return (
+    <Animated.View style={[animatedStyle, { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 24, padding: 16, marginHorizontal: 16, marginBottom: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' }]}>
+      <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(226,232,240,0.5)' }} />
+      <YStack flex={1} marginLeft="$3" space="$2">
+        <View style={{ width: 140, height: 16, borderRadius: 6, backgroundColor: 'rgba(226,232,240,0.5)' }} />
+        <View style={{ width: '70%', height: 14, borderRadius: 7, backgroundColor: 'rgba(241,245,249,0.5)' }} />
+      </YStack>
+    </Animated.View>
+  );
+};
+
+// --- Empty State ---
 const EmptyPulseIcon = ({ isSearch }: { isSearch: boolean }) => {
   const scale = useSharedValue(0.95);
   useEffect(() => {
@@ -103,52 +149,124 @@ const EmptyPulseIcon = ({ isSearch }: { isSearch: boolean }) => {
   }, []);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
-    <Animated.View style={[styles.emptyIconBadge, style]}>
+    <Animated.View style={[style, { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }]}>
       <LinearGradient colors={['#e0e7ff', '#fae8ff']} style={StyleSheet.absoluteFillObject} />
       {isSearch ? <Search color="#6366f1" size={32} /> : <MessageSquare color="#6366f1" size={32} style={{ zIndex: 1 }} />}
     </Animated.View>
   );
 };
 
-const SkeletonRow = ({ index }: { index: number }) => {
-  const translateX = useSharedValue(-200);
-  useEffect(() => { translateX.value = withRepeat(withTiming(400, { duration: 1200 }), -1, false); }, []);
-  const style = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+const FilterButton = ({ label, type, activeFilter, onSelect, gradientColors }: any) => {
+  const { isDark } = useThemeContext();
+  const isActive = activeFilter === type;
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.92, { damping: 15 });
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+    }
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15 });
+  };
+
+  const inactiveBorder = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
+  const inactiveBg = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)';
+  const inactiveText = isDark ? '#94a3b8' : '#475569';
+
   return (
-    <Animated.View entering={FadeInDown.delay(index * 40)} style={styles.chatRow}>
-       <View style={[styles.avatar, {backgroundColor: '#e2e8f0', overflow: 'hidden'}]}>
-          <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
-            <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
-          </Animated.View>
-       </View>
-       <YStack flex={1} marginLeft="$3" space="$2" justifyContent="center">
-         <View style={{width: '40%', height: 16, backgroundColor: '#e2e8f0', borderRadius: TOKENS.RADIUS.SM, overflow: 'hidden'}}>
-            <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
-              <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
-            </Animated.View>
-         </View>
-         <View style={{width: '70%', height: 14, backgroundColor: '#f1f5f9', borderRadius: 7, overflow: 'hidden'}}>
-            <Animated.View style={[StyleSheet.absoluteFillObject, style, { width: 200, left: -100 }]}>
-              <LinearGradient colors={['transparent', 'rgba(255,255,255,0.6)', 'transparent']} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
-            </Animated.View>
-         </View>
-       </YStack>
-    </Animated.View>
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={() => onSelect(type)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
+      <Animated.View
+        style={[
+          {
+            borderRadius: 20,
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderWidth: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'hidden',
+            borderColor: isActive ? gradientColors[0] : inactiveBorder,
+            backgroundColor: isActive ? 'transparent' : inactiveBg,
+          },
+          isActive && {
+            shadowColor: gradientColors[0],
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.5,
+            shadowRadius: 10,
+            elevation: 8,
+          },
+          animatedStyle
+        ]}
+      >
+        {isActive && (
+          <LinearGradient
+            colors={gradientColors}
+            start={{x:0,y:0}} end={{x:1,y:1}}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
+        <Text style={{
+          fontSize: 14,
+          fontWeight: isActive ? '700' : '600',
+          color: isActive ? '#ffffff' : inactiveText,
+          zIndex: 2,
+          letterSpacing: 0.3,
+        }}>
+          {label}
+        </Text>
+      </Animated.View>
+    </TouchableOpacity>
   );
 };
 
 export default function MessagesScreen() {
+  const { isDark } = useThemeContext();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { socket } = useCall();
   const [conversations, setConversations] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [filter, setFilter] = useState('all');
 
-  const deleteChat = (id) => {
+  // Background floating particles
+  const p1Y = useSharedValue(0);
+  const p2Y = useSharedValue(0);
+  const p3Y = useSharedValue(0);
+  const p4Y = useSharedValue(0);
+  const p5Y = useSharedValue(0);
+
+  useEffect(() => {
+    p1Y.value = withRepeat(withTiming(-20, { duration: 4000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p2Y.value = withRepeat(withTiming(25, { duration: 5000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p3Y.value = withRepeat(withTiming(-30, { duration: 6000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p4Y.value = withRepeat(withTiming(15, { duration: 4500, easing: Easing.inOut(Easing.ease) }), -1, true);
+    p5Y.value = withRepeat(withTiming(-25, { duration: 5500, easing: Easing.inOut(Easing.ease) }), -1, true);
+  }, []);
+
+  const p1Style = useAnimatedStyle(() => ({ transform: [{ translateY: p1Y.value }] }));
+  const p2Style = useAnimatedStyle(() => ({ transform: [{ translateY: p2Y.value }] }));
+  const p3Style = useAnimatedStyle(() => ({ transform: [{ translateY: p3Y.value }] }));
+  const p4Style = useAnimatedStyle(() => ({ transform: [{ translateY: p4Y.value }] }));
+  const p5Style = useAnimatedStyle(() => ({ transform: [{ translateY: p5Y.value }] }));
+
+  const deleteChat = (id: string) => {
     Alert.alert('Delete Chat', 'Are you sure you want to delete this conversation?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
@@ -158,31 +276,31 @@ export default function MessagesScreen() {
     ]);
   };
 
-  const renderRightActions = (id, progress: RNAnimated.AnimatedInterpolation<number>, dragX: RNAnimated.AnimatedInterpolation<number>) => {
-    const scale = dragX.interpolate({
-      inputRange: [-100, -50, 0],
-      outputRange: [1, 0.5, 0],
-      extrapolate: 'clamp',
-    });
+  const renderRightActions = (id: string, progress: any, dragX: any) => {
     return (
-      <View style={styles.swipeActionsContainer}>
-        <TouchableOpacity style={styles.swipeActionBtn} onPress={() => {}}>
+      <View style={{ flexDirection: 'row', width: 140, marginBottom: 12, marginRight: 16, borderTopRightRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' }}>
+        <TouchableOpacity style={{ flex: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }} onPress={() => {
+          setConversations(prev => prev.filter(c => c.contact?.id !== id));
+          setFiltered(prev => prev.filter(c => c.contact?.id !== id));
+          api.archiveChat(id).catch(console.error);
+        }}>
            <LinearGradient colors={TOKENS.GRADIENTS.GOLD} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-           <RNAnimated.View style={{ transform: [{ scale }], zIndex: 1 }}>
+           <View style={{ zIndex: 1, alignItems: 'center' }}>
              <Archive color="#fff" size={22} />
-           </RNAnimated.View>
+           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => deleteChat(id)} style={[styles.swipeActionBtn, styles.swipeActionBtnRight]}>
+        <TouchableOpacity onPress={() => deleteChat(id)} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderTopRightRadius: 24, borderBottomRightRadius: 24 }}>
            <LinearGradient colors={TOKENS.GRADIENTS.DANGER} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-           <RNAnimated.View style={{ transform: [{ scale }], zIndex: 1 }}>
+           <View style={{ zIndex: 1, alignItems: 'center' }}>
              <Trash2 color="#fff" size={22} />
-           </RNAnimated.View>
+           </View>
         </TouchableOpacity>
       </View>
     );
   };
 
   const loadConversations = async (isRefresh = false) => {
+    if (!user?.id || !api.getToken()) return;
     if (isRefresh) setRefreshing(true);
     else if (conversations.length === 0) setLoading(true);
     try {
@@ -190,7 +308,7 @@ export default function MessagesScreen() {
       if (res.success && res.conversations) {
         let convs = res.conversations;
         if (user) {
-           convs = await Promise.all(convs.map(async (c) => {
+           convs = await Promise.all(convs.map(async (c: any) => {
              if (c.lastMessage && c.contact) {
                 const decrypted = await decryptMessage(c.lastMessage.text, user.id, c.contact.id);
                 c.lastMessage.text = decrypted;
@@ -212,211 +330,331 @@ export default function MessagesScreen() {
   useFocusEffect(useCallback(() => { loadConversations(); }, [user]));
 
   useEffect(() => {
-    if (!search.trim()) { setFiltered(conversations); return; }
-    const q = search.toLowerCase();
-    setFiltered(conversations.filter(c => (c.contact?.name || '').toLowerCase().includes(q) || (c.lastMessage?.text || '').toLowerCase().includes(q)));
-  }, [search, conversations]);
+    if (!socket) return;
+    const handleMsg = () => loadConversations();
+    socket.on('message:received', handleMsg);
+    return () => { socket.off('message:received', handleMsg); };
+  }, [socket]);
+
+  // Filter logic
+  useEffect(() => {
+    let result = conversations;
+    
+    // Apply category filter
+    if (filter === 'unread') {
+      result = result.filter(c => (c.unreadCount || 0) > 0);
+    } else if (filter === 'groups') {
+      result = result.filter(c => c.isGroup);
+    } else if (filter === 'archived') {
+      result = result.filter(c => c.isArchived);
+    }
+    
+    // Apply search filter
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(c => 
+        (c.contact?.name || '').toLowerCase().includes(q) || 
+        (c.lastMessage?.text || '').toLowerCase().includes(q)
+      );
+    }
+    
+    setFiltered(result);
+  }, [search, conversations, filter]);
 
   const onRefresh = () => loadConversations(true);
 
-  const searchScale = useSharedValue(1);
-  const searchAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: searchScale.value }],
-    shadowColor: isSearchFocused ? '#005eb8' : '#64748b',
-    shadowOpacity: isSearchFocused ? 0.2 : 0.08,
-    shadowRadius: isSearchFocused ? 12 : 8,
-    elevation: isSearchFocused ? 6 : 2,
-    borderColor: isSearchFocused ? 'rgba(0, 94, 184, 0.3)' : '#e2e8f0',
-  }));
+  const handleFilterChange = (newFilter: string) => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+    setFilter(newFilter);
+  };
 
-  useEffect(() => {
-    searchScale.value = withTiming(isSearchFocused ? 1.02 : 1, { duration: 200 });
-  }, [isSearchFocused]);
+  const renderRow = (conv: any, index: number) => {
+    const contact = conv.contact;
+    if (!contact) return null;
+    const name = contact.name || 'Unknown';
+    const initial = name.charAt(0).toUpperCase();
+    const avatarBg = getColor(name);
+    const lastMsg = conv.lastMessage;
+    const unread = conv.unreadCount || 0;
+    const isOnline = contact.onlineStatus === 'online';
+    const isUnread = unread > 0;
 
-  if (loading) {
+    const avatarStatus = isOnline ? 'online' : isUnread ? 'unread' : 'offline';
+
     return (
-      <View style={styles.container}>
-        <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={styles.header}>
-            <Text style={styles.appTitle}>UniCom</Text>
-          </View>
-          <View style={styles.searchContainer}>
-            <View style={[styles.searchBar, { backgroundColor: '#fff', borderColor: '#e2e8f0', shadowOpacity: 0.05 }]} />
-          </View>
-          <View style={{flex: 1}}>
-            {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonRow key={i} index={i} />)}
-          </View>
-        </SafeAreaView>
-      </View>
+      <Animated.View key={conv.chatId || contact.id} entering={SlideInRight.delay(index * 60).springify().damping(15)} style={[styles.cardContainer, isUnread && styles.cardContainerUnread]}>
+        {/* Glassmorphic Gradient Background — theme-adaptive */}
+        {!isUnread && (
+          <LinearGradient 
+            colors={isDark ? ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)'] : ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']} 
+            start={{x:0, y:0}} end={{x:0, y:1}} style={StyleSheet.absoluteFillObject} />
+        )}
+        
+        <Swipeable renderRightActions={(progress, dragX) => renderRightActions(contact.id, progress, dragX)} rightThreshold={40} overshootRight={false}>
+          <TouchableHighlight
+            style={styles.rowInner}
+            onPress={() => router.push(`/chat/${contact.id}`)}
+            underlayColor="rgba(255,255,255,0.05)"
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              {/* Animated Avatar Ring */}
+              <View style={{ position: 'relative' }}>
+                <AnimatedAvatarRing status={avatarStatus}>
+                  {contact.avatar ? (
+                    <Image source={{ uri: contact.avatar }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                  ) : (
+                    <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: avatarBg, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text color="#fff" fontWeight="900" fontSize={20}>{initial}</Text>
+                    </View>
+                  )}
+                </AnimatedAvatarRing>
+                {isOnline && <PulseDot />}
+              </View>
+
+              {/* Content */}
+              <YStack flex={1} marginLeft="$3">
+                <XStack justifyContent="space-between" alignItems="center">
+                  <Text fontWeight={isUnread ? '900' : '700'} fontSize={16} color={isDark ? (isUnread ? '#f1f5f9' : '#cbd5e1') : (isUnread ? '#0f172a' : '#334155')} numberOfLines={1} flex={1}>
+                    {name}
+                  </Text>
+                  <Text fontSize={12} color={isUnread ? (isDark ? '#38bdf8' : '#0284c7') : (isDark ? '#64748b' : '#94a3b8')} fontWeight={isUnread ? '800' : '600'} marginLeft="$2">
+                    {formatTime(lastMsg?.createdAt || '')}
+                  </Text>
+                </XStack>
+                <XStack justifyContent="space-between" alignItems="center" marginTop={4}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    {getLastMessagePreview(lastMsg, isDark)}
+                  </View>
+                  {isUnread && (
+                    <Animated.View entering={FadeInDown.springify()} style={styles.unreadBadge}>
+                      <LinearGradient colors={['#ef4444', '#dc2626']} start={{x:0, y:0}} end={{x:1, y:1}} style={[StyleSheet.absoluteFillObject, { borderRadius: 12 }]} />
+                      <Text color="#fff" fontSize={11} fontWeight="800" style={{ zIndex: 1 }}>{unread > 99 ? '99+' : unread}</Text>
+                    </Animated.View>
+                  )}
+                </XStack>
+              </YStack>
+            </View>
+          </TouchableHighlight>
+        </Swipeable>
+      </Animated.View>
     );
-  }
+  };
+
+  const styles = getStyles(isDark);
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
-      <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <Animated.View entering={FadeInDown.duration(400)}>
-          <View style={styles.header}>
-            <Text style={styles.appTitle}>UniCom</Text>
-            <ScaleButton onPress={() => console.log('Edit pressed')} style={styles.headerIconBtnShadow}>
-              <View style={styles.headerIconBtn}>
-                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
-                <Edit color="#fff" size={20} style={{ zIndex: 1 }} />
-              </View>
-            </ScaleButton>
-          </View>
+      {/* === FULL-SCREEN THEME-ADAPTIVE GRADIENT (Option A — Clean) === */}
+      <LinearGradient
+        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
+        locations={[0, 0.5, 1]}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
 
-          {/* Search */}
-          <View style={styles.searchContainer}>
-            <Animated.View style={[styles.searchBar, searchAnimatedStyle]}>
-              <Search color={isSearchFocused ? "#005eb8" : "#94a3b8"} size={18} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search conversations..."
-                placeholderTextColor="#94a3b8"
-                value={search}
-                onChangeText={setSearch}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setIsSearchFocused(false)}
-              />
-              {search.length > 0 && (
-                <Animated.View entering={FadeInDown.duration(200)}>
-                  <TouchableOpacity onPress={() => setSearch('')} style={styles.clearBtn} activeOpacity={0.6}>
-                    <X color={TOKENS.COLORS.TEXT_SECONDARY} size={16} />
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
-            </Animated.View>
+      {/* Background Particles */}
+      <View style={[StyleSheet.absoluteFillObject, { zIndex: 1, pointerEvents: 'none' }]}>
+        <Animated.View style={[styles.particle, { backgroundColor: '#8b5cf6', top: 380, left: 20, width: 8, height: 8 }, p1Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#06b6d4', top: 580, right: 30, width: 12, height: 12 }, p2Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#ec4899', top: 780, left: 40, width: 6, height: 6 }, p3Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#3b82f6', top: 480, right: 60, width: 9, height: 9 }, p4Style]} />
+        <Animated.View style={[styles.particle, { backgroundColor: '#a855f7', top: 680, left: 80, width: 10, height: 10 }, p5Style]} />
+      </View>
+
+      {/* Top Fixed Section (Search + Filters) */}
+      <View style={{ paddingTop: insets.top + 10, zIndex: 10, paddingBottom: 10 }}>
+        {/* Search Bar */}
+        <XStack paddingHorizontal="$4" marginBottom="$4">
+          <View style={[styles.searchContainer, { 
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+            borderColor: isSearchFocused ? (isDark ? '#38bdf8' : '#0ea5e9') : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'),
+            borderWidth: 1.5,
+            shadowColor: isSearchFocused ? (isDark ? '#38bdf8' : '#0ea5e9') : (isDark ? '#000' : '#64748b'),
+            shadowOffset: { width: 0, height: isSearchFocused ? 6 : 4 },
+            shadowOpacity: isSearchFocused ? (isDark ? 0.3 : 0.2) : (isDark ? 0 : 0.1),
+            shadowRadius: isSearchFocused ? 16 : 12,
+            elevation: isDark ? 0 : 4,
+          }]}>
+            <Image source={require('../../assets/images/logo-icon-transparent.png')} style={{ width: 28, height: 28, marginLeft: 16 }} />
+            <TextInput
+              style={[styles.searchInput, { color: isDark ? '#fff' : '#1e293b' }, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
+              placeholder="Search chats..."
+              placeholderTextColor={isDark ? "#94a3b8" : "#64748b"}
+              value={search}
+              onChangeText={setSearch}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity onPress={() => setSearch('')} style={{ marginRight: 6 }}>
+              <LinearGradient colors={['#38bdf8', '#818cf8']} style={styles.searchIconBtn}>
+                {search.length > 0 ? <X color="#fff" size={18} /> : <Search color="#fff" size={18} />}
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
+        </XStack>
+
+        {/* Filter Pills */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+          <FilterButton label="All" type="all" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#0ea5e9', '#3b82f6']} />
+          <FilterButton label="Unread" type="unread" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#f43f5e', '#ec4899']} />
+          <FilterButton label="Groups" type="groups" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#10b981', '#14b8a6']} />
+          <FilterButton label="Archived" type="archived" activeFilter={filter} onSelect={handleFilterChange} gradientColors={['#8b5cf6', '#6366f1']} />
+        </ScrollView>
+      </View>
+
+      {/* Main Content */}
+      {loading ? (
+        <View style={{ paddingTop: 16 }}>
+          {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} index={i} />)}
+        </View>
+      ) : filtered.length === 0 ? (
+        <Animated.View entering={FadeInUp.delay(200)} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: -40, zIndex: 5 }}>
+          <EmptyPulseIcon isSearch={!!search} />
+          <Text fontSize={22} fontWeight="800" color={isDark ? "#f1f5f9" : "#0f172a"} marginTop="$5">
+            {search ? 'No results found' : filter === 'unread' ? 'All caught up!' : filter === 'groups' ? 'No groups yet' : filter === 'archived' ? 'No archived chats' : 'No messages yet'}
+          </Text>
+          <Text fontSize={15} color={isDark ? "#94a3b8" : "#64748b"} marginTop="$2" textAlign="center" paddingHorizontal="$4" lineHeight={22}>
+            {search ? `We couldn't find any chats matching "${search}"` : 'Start a new conversation and experience seamless encrypted messaging!'}
+          </Text>
         </Animated.View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1, zIndex: 5 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 100 }}
+        >
+          {filtered.map((conv, index) => renderRow(conv, index))}
+        </ScrollView>
+      )}
 
-        {filtered.length === 0 ? (
-          <Animated.View entering={FadeInUp.delay(200)} style={styles.emptyState}>
-            <EmptyPulseIcon isSearch={!!search} />
-            <Text fontSize={22} fontWeight="800" color={TOKENS.COLORS.TEXT_PRIMARY} marginTop="$5">
-              {search ? 'No results found' : 'No messages yet'}
-            </Text>
-            <Text fontSize={15} color={TOKENS.COLORS.TEXT_SECONDARY} marginTop="$2" textAlign="center" paddingHorizontal="$4" lineHeight={22}>
-              {search ? `We couldn't find any chats matching "${search}"` : 'Your inbox is empty. Start a new conversation and experience seamless translation!'}
-            </Text>
-          </Animated.View>
-        ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#005eb8" />}
-            contentContainerStyle={{ paddingBottom: Math.max((insets?.bottom || 0) + 120, 140) }}
-          >
-            {filtered.map((conv, index) => {
-              const contact = conv.contact;
-              if (!contact) return null;
-              const name = contact.name || 'Unknown';
-              const initial = name.charAt(0).toUpperCase();
-              const avatarBg = getColor(name);
-              const lastMsg = conv.lastMessage;
-              const unread = conv.unreadCount || 0;
-              const isOnline = contact.onlineStatus === 'online';
-              const isUnread = unread > 0;
 
-              return (
-                <Animated.View key={conv.chatId || contact.id} entering={FadeInUp.delay(index * 60)}>
-                  <Swipeable renderRightActions={(progress, dragX) => renderRightActions(contact.id, progress, dragX)} rightThreshold={40} overshootRight={false}>
-                    <TouchableHighlight 
-                      style={[styles.chatRow, isUnread && styles.chatRowUnread]}
-                      onPress={() => router.push(`/chat/${contact.id}`)}
-                      underlayColor="#e2e8f0"
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        {/* Avatar */}
-                        <View style={styles.avatarWrapper}>
-                          {contact.avatar ? (
-                            <Image source={{ uri: contact.avatar }} style={styles.avatar} />
-                          ) : (
-                            <View style={[styles.avatar, { backgroundColor: avatarBg, alignItems: 'center', justifyContent: 'center' }]}>
-                              <Text color="#fff" fontWeight="900" fontSize={20}>{initial}</Text>
-                            </View>
-                          )}
-                          {isOnline && <PulseDot />}
-                        </View>
-
-                        {/* Content */}
-                        <YStack flex={1} marginLeft="$3">
-                          <XStack justifyContent="space-between" alignItems="center">
-                            <Text fontWeight={isUnread ? '900' : '700'} fontSize={16} color={TOKENS.COLORS.TEXT_PRIMARY} numberOfLines={1} flex={1}>
-                              {name}
-                            </Text>
-                            <Text fontSize={12} color={isUnread ? '#005eb8' : '#94a3b8'} fontWeight={isUnread ? '800' : '600'} marginLeft="$2">
-                              {formatTime(lastMsg?.createdAt || '')}
-                            </Text>
-                          </XStack>
-                          <XStack justifyContent="space-between" alignItems="center" marginTop={4}>
-                            <View style={{ flex: 1, marginRight: 8 }}>
-                              {getLastMessagePreview(lastMsg)}
-                            </View>
-                            {isUnread && (
-                              <Animated.View key={unread} entering={FadeInDown.springify()} style={styles.unreadBadgeShadow}>
-                                <LinearGradient colors={TOKENS.GRADIENTS.DANGER} start={{x:0, y:0}} end={{x:1, y:1}} style={[StyleSheet.absoluteFillObject, { borderRadius: TOKENS.RADIUS.MD }]} />
-                                <Text color="#fff" fontSize={11} fontWeight="800" style={{ zIndex: 1 }}>{unread > 99 ? '99+' : unread}</Text>
-                              </Animated.View>
-                            )}
-                          </XStack>
-                        </YStack>
-                      </View>
-                    </TouchableHighlight>
-                  </Swipeable>
-                </Animated.View>
-              );
-            })}
-          </ScrollView>
-        )}
-      </SafeAreaView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  appTitle: {
-    fontSize: 28, fontWeight: '900', color: '#005eb8', letterSpacing: -0.5,
-    shadowColor: '#005eb8', shadowOpacity: 0.15, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2,
+function getStyles(isDark: boolean) { return StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: isDark ? '#0f172a' : '#f0f4ff',
   },
-  headerIconBtnShadow: {
-    shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5, borderRadius: TOKENS.RADIUS.LG,
+  headerGradientAbsolute: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 220,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+    zIndex: 0,
   },
-  headerIconBtn: { width: 40, height: 40, borderRadius: TOKENS.RADIUS.LG, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  searchContainer: { marginHorizontal: 16, marginBottom: 16 },
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', 
-    paddingHorizontal: 16, height: 46, borderRadius: 23, gap: 10,
-    borderWidth: 1.5,
+  star: {
+    position: 'absolute',
+    width: 3,
+    height: 3,
+    backgroundColor: '#38bdf8',
+    borderRadius: 3,
+    opacity: 0.7,
+    shadowColor: '#38bdf8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
   },
-  searchInput: { flex: 1, fontSize: 16, color: '#0f172a', fontWeight: '500', outlineStyle: 'none' } as any,
-  clearBtn: { width: 24, height: 24, borderRadius: TOKENS.RADIUS.MD, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
-  chatRow: { 
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, 
-    backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: TOKENS.RADIUS.LG,
-    ...TOKENS.SHADOWS.SUBTLE,
+  searchContainer: {
+    flex: 1,
+    height: 56,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  chatRowUnread: { backgroundColor: 'rgba(0, 94, 184, 0.035)' },
-  avatarWrapper: { position: 'relative', width: 56, height: 56 },
-  avatar: { width: 56, height: 56, borderRadius: TOKENS.RADIUS.XL, borderWidth: 2, borderColor: '#fff', ...TOKENS.SHADOWS.ELEVATED },
-  onlineDotWrapper: { position: 'absolute', bottom: 1, right: 1, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
-  onlineDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#fff' },
-  onlineDotGlow: { position: 'absolute', width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', opacity: 0.6 },
-  msgText: { fontSize: 14, color: '#64748b', fontWeight: '500', flexShrink: 1 },
-  chipBase: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  unreadBadgeShadow: {
-    minWidth: 24, height: 24, borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5,
+  searchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+    paddingHorizontal: 12,
   },
-  swipeActionsContainer: { 
-    flexDirection: 'row', width: 140, marginBottom: 10, marginRight: 16, 
-    borderTopRightRadius: TOKENS.RADIUS.LG, borderBottomRightRadius: TOKENS.RADIUS.LG, overflow: 'hidden' 
+  searchIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  swipeActionBtn: { flex: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  swipeActionBtnRight: { borderTopRightRadius: TOKENS.RADIUS.LG, borderBottomRightRadius: TOKENS.RADIUS.LG },
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, marginTop: -40 },
-  emptyIconBadge: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
-});
+
+  // ── THEME-ADAPTIVE CARD STYLES ──
+  cardContainer: {
+    marginBottom: 8,
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : (isDark ? '#1e293b' : '#ffffff'),
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: isDark ? '#334155' : '#e2e8f0',
+    overflow: 'hidden',
+    shadowColor: isDark ? '#06b6d4' : '#818cf8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: isDark ? 0.25 : 0.18,
+    shadowRadius: 20,
+    elevation: Platform.OS === 'web' ? 8 : 2,
+  },
+  cardContainerUnread: {
+    backgroundColor: isDark ? '#1a2436' : '#f0f9ff',
+    borderColor: isDark ? '#0284c7' : '#bae6fd',
+  },
+  rowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    backgroundColor: 'transparent',
+  },
+  unreadBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  particle: {
+    position: 'absolute',
+    borderRadius: 99,
+    opacity: 0.5,
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    zIndex: 20,
+  },
+  fabOuter: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#06b6d4',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  fabInner: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+}); }

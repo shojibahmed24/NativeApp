@@ -73,7 +73,7 @@ export default function BlockingScreen() {
 
       <YStack space="$4" flex={1}>
         <GlassCard padding="$4" alignItems="center" space="$2">
-          <ShieldAlert color="#d9534f" size={32} />
+          <ShieldAlert color={TOKENS.COLORS.SUCCESS} size={32} />
           <Text fontWeight="bold" fontSize="$5" color={isDark ? '#f8fafc' : '#0f172a'}>
             Spam Protection Active
           </Text>
@@ -89,9 +89,15 @@ export default function BlockingScreen() {
           {loading ? (
             <ActivityIndicator color="#005eb8" size="large" style={{ marginTop: 20 }} />
           ) : blockedContacts.length === 0 ? (
-            <Text color={isDark ? '#94a3b8' : '#64748b'} textAlign="center" marginTop="$4">
-              No blocked numbers.
-            </Text>
+            <YStack alignItems="center" justifyContent="center" marginTop="$8" paddingHorizontal="$4" space="$3">
+              <ShieldBan size={48} color={isDark ? '#475569' : '#94a3b8'} style={{ marginBottom: 4 }} />
+              <Text fontWeight="bold" fontSize="$5" color={isDark ? '#f8fafc' : '#0f172a'} textAlign="center">
+                No Blocked Numbers
+              </Text>
+              <Text color={isDark ? '#94a3b8' : '#64748b'} textAlign="center" fontSize="$3" maxWidth={280}>
+                Calls and messages from blocked numbers will be prevented. You haven't blocked anyone yet.
+              </Text>
+            </YStack>
           ) : (
             <GlassCard padding="$0" overflow="hidden" marginBottom="$8">
               {blockedContacts.map((contact, index) => (

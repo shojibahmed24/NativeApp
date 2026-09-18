@@ -44,9 +44,8 @@ export const api = {
     try {
       if (Platform.OS !== 'web') {
         await SecureStore.setItemAsync('unicom_user_token', token);
-      } else {
-        await AsyncStorage.setItem('unicom_user_token', token);
       }
+      await AsyncStorage.setItem('unicom_user_token', token);
     } catch(err) {}
   },
 
@@ -97,7 +96,29 @@ export const api = {
     return data;
   },
 
+  
   // Auth
+  checkUser(phone) {
+    return this.request('/auth/check-user', {
+      method: 'POST',
+      body: JSON.stringify({ phone })
+    });
+  },
+
+  registerWithPassword(phone, name, password, registrationToken, deviceId) {
+    return this.request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ phone, name, password, registrationToken, deviceId })
+    });
+  },
+
+  loginWithPassword(phone, password, deviceId) {
+    return this.request('/auth/login-with-password', {
+      method: 'POST',
+      body: JSON.stringify({ phone, password, deviceId })
+    });
+  },
+
   requestOtp(phone, mode) {
     return this.request('/auth/request-otp', {
       method: 'POST',
@@ -120,6 +141,14 @@ export const api = {
   },
 
 
+  
+  updateSettings(settings) {
+    return this.request('/auth/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings)
+    });
+  },
+  
   getProfile() {
     return this.request('/auth/profile');
   },
@@ -258,7 +287,7 @@ export const api = {
     }
     if (fileName.endsWith('.jpeg')) fileName = fileName.replace('.jpeg', '.jpg');
     
-    formData.append('file', file, fileName);
+    formData.append('file', { uri: file.uri, name: fileName, type: file.type || 'image/jpeg' });
     return this.request(`/storage/upload?type=${type}`, {
       method: 'POST',
       body: formData,
