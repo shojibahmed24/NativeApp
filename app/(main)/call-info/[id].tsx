@@ -2,7 +2,8 @@
 import * as Clipboard from 'expo-clipboard';
 import { useThemeContext } from '../../../src/context/ThemeContext';
 import React, { useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, View, StyleSheet, Platform, TouchableHighlight, ActivityIndicator, Modal, Alert, SafeAreaView } from 'react-native';
+import { ScrollView, TouchableOpacity, View, StyleSheet, Platform, TouchableHighlight, ActivityIndicator, Modal, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { YStack, XStack, Text, Avatar } from 'tamagui';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, MessageSquare, Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, MoreVertical, Sparkles, PhoneOff, User, Copy, Ban, Trash2, X } from 'lucide-react-native';
