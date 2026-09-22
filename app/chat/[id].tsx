@@ -50,7 +50,7 @@ const ScaleButton = ({ onPress, children, style, ...props }: any) => {
 
 
 const MessageBubble = React.memo(({ msg, isTranslated, translatedMessages, renderRightActions, setReplyingTo, setActivePaymentMsg, setPaymentModalVisible, toggleChecklistItem, toggleTranslation, id, isDark }: any) => {
-    const isTranslated = translatedMessages[msg.id];
+    
     return (
       <Swipeable
         renderRightActions={(p, d) => renderRightActions(p, d, msg)}
