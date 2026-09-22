@@ -76,7 +76,7 @@ const CountUpNumber = ({ endValue, style }: { endValue: number, style: any }) =>
   useEffect(() => {
     let start = 0;
     const duration = 800;
-    const stepTime = 20;
+    const stepTime = 50;
     const steps = duration / stepTime;
     const increment = endValue / steps;
     const timer = setInterval(() => {

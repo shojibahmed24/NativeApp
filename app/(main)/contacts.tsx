@@ -154,14 +154,15 @@ const InviteButton = ({ onInvite }: { onInvite: () => void }) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     transX.value = withTiming(20, { duration: 250 });
     opacity.value = withTiming(0, { duration: 250 });
-    setTimeout(() => {
+    const timer1 = setTimeout(() => {
       onInvite();
       transX.value = -10;
-      setTimeout(() => {
+      const timer2 = setTimeout(() => {
         opacity.value = withTiming(1, { duration: 200 });
         transX.value = withTiming(0, { duration: 200 });
       }, 100);
     }, 250);
+    return () => clearTimeout(timer1);
   };
 
   const iconStyle = useAnimatedStyle(() => ({

@@ -36,7 +36,7 @@ export default function OtpScreen() {
 
   useEffect(() => {
     // Focus first input on mount
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       if (inputRefs.current[0]) {
         inputRefs.current[0].focus();
       }
@@ -48,6 +48,7 @@ export default function OtpScreen() {
       -1,
       true
     );
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {

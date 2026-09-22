@@ -19,9 +19,7 @@ if (process.env.EXPO_PUBLIC_SENTRY_DSN && process.env.EXPO_PUBLIC_SENTRY_DSN.sta
 
 import tamaguiConfig from '../tamagui.config'
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
-import { setupCallKeep } from '../src/services/CallKeepService';
-import { CallProvider } from '../src/context/CallContext'
-import { ChatProvider } from '../src/context/ChatContext'
+// removed providers
 import { ThemeProvider, useThemeContext } from '../src/context/ThemeContext'
 import IncomingCallModal from '../src/components/IncomingCallModal'
 
@@ -135,12 +133,7 @@ function InnerApp() {
             } : {}}
           >
             <AuthProvider>
-              <CallProvider>
-                <ChatProvider>
-                  <RootLayoutNav />
-                  <IncomingCallModal />
-                </ChatProvider>
-              </CallProvider>
+              <RootLayoutNav />
             </AuthProvider>
           </View>
         </View>
@@ -150,9 +143,7 @@ function InnerApp() {
 }
 
 function RootLayout() {
-  useEffect(() => {
-    setupCallKeep();
-  }, []);
+
   
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

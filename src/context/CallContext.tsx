@@ -448,29 +448,28 @@ export const CallProvider = ({ children }) => {
     setTranslationStatus('ready');
   };
 
-  return (
-    const contextValue = useMemo(() => ({
-        activeCall,
-        incomingCall,
-        callStartTime: callStartTimeRef.current,
-        isMuted,
-        setIsMuted,
-        isSpeakerOn,
-        setIsSpeakerOn,
-        translationStatus,
-        lastTranslatedSpeech,
-        callLatency,
-        callHistory,
-        startVoiceCall,
-        startVideoCall,
-        toggleVideo,
-        acceptIncomingCall,
-        rejectIncomingCall,
-        endCurrentCall,
-        speakInCall,
-        triggerBargeIn,
-        socket: socketRef.current
-      }), [activeCall, incomingCall, isMuted, isSpeakerOn, translationStatus, lastTranslatedSpeech, callLatency, callHistory, startVoiceCall, startVideoCall, toggleVideo, acceptIncomingCall, rejectIncomingCall, endCurrentCall, speakInCall, triggerBargeIn, socketRef.current]);
+  const contextValue = useMemo(() => ({
+    activeCall,
+    incomingCall,
+    callStartTime: callStartTimeRef.current,
+    isMuted,
+    setIsMuted,
+    isSpeakerOn,
+    setIsSpeakerOn,
+    translationStatus,
+    lastTranslatedSpeech,
+    callLatency,
+    callHistory,
+    startVoiceCall,
+    startVideoCall,
+    toggleVideo,
+    acceptIncomingCall,
+    rejectIncomingCall,
+    endCurrentCall,
+    speakInCall,
+    triggerBargeIn,
+    socket: socketRef.current
+  }), [activeCall, incomingCall, isMuted, isSpeakerOn, translationStatus, lastTranslatedSpeech, callLatency, callHistory]);
 
   return (
     <CallContext.Provider value={contextValue}>
@@ -480,5 +479,6 @@ export const CallProvider = ({ children }) => {
 };
 
 export const useCall = () => useContext(CallContext);
+
 
 

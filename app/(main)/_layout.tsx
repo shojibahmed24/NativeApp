@@ -1,4 +1,9 @@
 import React, { useEffect } from 'react';
+import { CallProvider } from '../../src/context/CallContext';
+import { ChatProvider } from '../../src/context/ChatContext';
+import CallKeepService from '../../src/services/CallKeepService';
+import IncomingCallModal from '../../src/components/IncomingCallModal';
+
 import { Tabs } from 'expo-router';
 import { Phone, MessageSquare, Users, ShieldBan, Grip, User, CheckSquare } from 'lucide-react-native';
 import { YStack, View, Text } from 'tamagui';
@@ -132,8 +137,15 @@ const CenterDialpadButton = ({ onPress, style }: any) => {
 
 export default function MainLayout() {
   const { isDark } = useThemeContext();
+
+  useEffect(() => {
+    CallKeepService.setupCallKeep();
+  }, []);
+
   return (
-    <Tabs
+    <CallProvider>
+      <ChatProvider>
+        <Tabs
       screenOptions={{
         headerShown: false,
         tabBarLabelPosition: 'below-icon',
@@ -217,5 +229,8 @@ export default function MainLayout() {
       <Tabs.Screen name="call-info/[id]" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="shared-media/[id]" options={{ href: null, tabBarStyle: { display: 'none' } }} />
     </Tabs>
+        <IncomingCallModal />
+      </ChatProvider>
+    </CallProvider>
   );
 }

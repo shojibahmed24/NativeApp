@@ -429,8 +429,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     await AsyncStorage.setItem('@quick_replies', JSON.stringify(newReplies));
   }, [quickReplies]);
 
-  return (
-    const contextValue = useMemo(() => ({ activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally }), [activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally]);
+  const contextValue = useMemo(() => ({ activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally }), [activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally]);
 
   return (
     <ChatContext.Provider value={contextValue}>
