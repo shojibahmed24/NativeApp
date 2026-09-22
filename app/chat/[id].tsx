@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useRef, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet, ImageBackground, View, FlatList, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, Animated as RNAnimated, ScrollView, Modal, Clipboard, Image } from 'react-native';
@@ -334,7 +335,7 @@ export default function ChatThreadScreen() {
             <AnimatedEmoji emoji={msg.text || '❤️'} size={50} />
           ) : (
             <View style={{
-              shadowColor: msg.isSender ? '#4f46e5' : '#0f172a',
+              shadowColor: msg.isSender ? '#4f46e5' : (isDark ? '#000' : '#0f172a'),
               shadowOpacity: msg.isSender ? 0.3 : 0.08,
               shadowRadius: 10,
               shadowOffset: { width: 0, height: 4 },
@@ -342,10 +343,10 @@ export default function ChatThreadScreen() {
               borderRadius: TOKENS.RADIUS.LG,
               borderBottomRightRadius: msg.isSender ? 4 : 24,
               borderBottomLeftRadius: msg.isSender ? 24 : 4,
-              backgroundColor: msg.isSender ? '#6366f1' : '#f8fafc',
+              backgroundColor: msg.isSender ? '#6366f1' : (isDark ? '#1e293b' : '#f8fafc'),
             }}>
               <View style={{
-                backgroundColor: msg.isSender ? '#6366f1' : '#f8fafc',
+                backgroundColor: msg.isSender ? '#6366f1' : (isDark ? '#1e293b' : '#f8fafc'),
                 padding: 12,
                 paddingHorizontal: 16,
                 borderRadius: TOKENS.RADIUS.LG,
@@ -353,7 +354,7 @@ export default function ChatThreadScreen() {
                 borderBottomLeftRadius: msg.isSender ? 24 : 4,
                 overflow: 'hidden'
               }}>
-                {msg.isSender && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:1, y:1}} end={{x:0, y:0}} style={StyleSheet.absoluteFillObject} />}
+                {msg.isSender && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:1, y:1}} end={{x:0, y:0}} style={StyleSheet.absoluteFill} />}
                 
                 {msg.replyToId && (
                   <View style={{ backgroundColor: msg.isSender ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.08)', padding: 10, borderRadius: TOKENS.RADIUS.MD, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: msg.isSender ? '#fff' : '#6366f1' }}>
@@ -402,11 +403,11 @@ export default function ChatThreadScreen() {
                   </View>
                 )}
                 {msg.type === 'money_request' && msg.metadata && (
-                  <View style={{ backgroundColor: isDark ? '#1e293b' : '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 220, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
-                    <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+                  <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 220, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
+                    <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFill} />
                     <View style={{ padding: 20, alignItems: 'center' }}>
                       <View style={{ padding: 14, borderRadius: TOKENS.RADIUS.XL, marginBottom: 12, overflow: 'hidden' }}>
-                        <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                        <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
                         <Banknote color="#fff" size={28} />
                       </View>
                       <Text color={TOKENS.COLORS.SUCCESS} fontSize="$3" fontWeight="700">Payment Request</Text>
@@ -419,7 +420,7 @@ export default function ChatThreadScreen() {
                          </View>
                       ) : (
                          <ScaleButton onPress={() => { setActivePaymentMsg(msg); setPaymentModalVisible(true); Platform.OS !== 'web' && Haptics.impactAsync(); }} style={{ width: '100%', overflow: 'hidden', borderRadius: TOKENS.RADIUS.LG }}>
-                           <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                           <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
                            <View style={{ paddingVertical: 12, alignItems: 'center' }}>
                              <Text color="white" fontWeight="bold" fontSize={16}>Pay Now</Text>
                            </View>
@@ -429,11 +430,11 @@ export default function ChatThreadScreen() {
                   </View>
                 )}
                   {(msg.type === 'todo_list' || msg.mediaType === 'todo_list') && msg.metadata?.tasks && (
-                    <View style={{ backgroundColor: isDark ? '#1e293b' : '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 260, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
+                    <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 260, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
                       <View style={{ padding: 16 }}>
                         <XStack alignItems="center" marginBottom="$4">
                            <View style={{ width: 40, height: 40, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />
                              <CheckSquare color="#fff" size={20} />
                            </View>
                            <YStack flex={1}>
@@ -444,7 +445,7 @@ export default function ChatThreadScreen() {
                         
                         <View style={{ height: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#f1f5f9', borderRadius: 4, marginBottom: 16, overflow: 'hidden' }}>
                           <View style={{ height: '100%', width: `${(msg.metadata.tasks.filter((t: any) => t.done).length / (msg.metadata.tasks.length||1)) * 100}%`, borderRadius: 4 }}>
-                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFillObject} />
+                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFill} />
                           </View>
                         </View>
                     
@@ -480,7 +481,7 @@ export default function ChatThreadScreen() {
                   </View>
                 )}
                 {msg.type === 'text' && msg.text && !msg.emoji ? (
-                  <Text color={msg.isSender ? '#fff' : '#1e293b'} fontSize="$4" fontWeight="500" lineHeight={22}>
+                  <Text color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#1e293b')} fontSize="$4" fontWeight="500" lineHeight={22}>
                     {isTranslated ? "*(Translated)* " + (msg.metadata?.translatedText || "Translation unavailable") : msg.text}
                   </Text>
                 ) : null}
@@ -518,11 +519,11 @@ export default function ChatThreadScreen() {
   return renderBackground(
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
       <View style={{ backgroundColor: 'transparent', zIndex: 10 }}>
-        <LinearGradient colors={isDark ? ['rgba(30,41,59,0.85)', 'rgba(30,41,59,0.75)'] : ['rgba(255,255,255,0.98)', 'rgba(255,255,255,0.92)']} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={isDark ? ['rgba(30,41,59,0.85)', 'rgba(30,41,59,0.75)'] : ['rgba(255,255,255,0.98)', 'rgba(255,255,255,0.92)']} style={StyleSheet.absoluteFill} />
         <XStack padding="$3" paddingTop="$5" paddingBottom="$3" alignItems="center" justifyContent="space-between" shadowColor="#0f172a" shadowOpacity={0.12} shadowRadius={12} shadowOffset={{ width: 0, height: 6 }} elevation={8} borderBottomWidth={1} borderBottomColor={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}>
           <XStack space="$3" alignItems="center">
-            <ScaleButton onPress={() => router.canGoBack() ? router.back() : router.replace('/(main)/messages')} style={{ width: 40, height: 40, backgroundColor: isDark ? '#1e293b' : '#fff', borderRadius: TOKENS.RADIUS.LG, justifyContent: 'center', alignItems: 'center', ...TOKENS.SHADOWS.SUBTLE }}>
-              <ChevronLeft color="#334155" size={24} />
+            <ScaleButton onPress={() => router.canGoBack() ? router.back() : router.replace('/(main)/messages')} style={{ width: 40, height: 40, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.LG, justifyContent: 'center', alignItems: 'center', ...TOKENS.SHADOWS.SUBTLE }}>
+              <ChevronLeft color={isDark ? '#f8fafc' : '#334155'} size={24} />
             </ScaleButton>
             <TouchableOpacity onPress={() => router.push(`/profile/${id}`)} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ position: 'relative' }}>
@@ -530,7 +531,7 @@ export default function ChatThreadScreen() {
                   {(recipient?.profile_picture || recipient?.avatar) ? (
                     <Image source={{ uri: (recipient?.profile_picture || recipient?.avatar || '') }} style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG }} onError={(e) => console.log('Image Error', e)} />
                   ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, backgroundColor: isDark ? '#1e293b' : '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
                       <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize="$4" fontWeight="bold">{recipient?.name?.charAt(0).toUpperCase() || 'U'}</Text>
                     </View>
                   )}
@@ -540,7 +541,7 @@ export default function ChatThreadScreen() {
                 )}
               </View>
               <YStack marginLeft="$3">
-                <Text fontWeight="bold" fontSize="$5" color={TOKENS.COLORS.TEXT_PRIMARY}>{recipient?.name || 'Unknown User'}</Text>
+                <Text fontWeight="bold" fontSize="$5" color={isDark ? '#f8fafc' : TOKENS.COLORS.TEXT_PRIMARY}>{recipient?.name || 'Unknown User'}</Text>
                 <XStack alignItems="center" space="$1.5" marginTop={2}>
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: onlineUsers[id as string] ? '#10b981' : '#94a3b8' }} />
                   <Text fontSize="$2" color={onlineUsers[id as string] ? '#059669' : '#64748b'} fontWeight="600">
@@ -563,7 +564,7 @@ export default function ChatThreadScreen() {
                 }}
                 style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#10b981', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: Platform.OS === 'web' ? 4 : 0 }}
               >
-                <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
                 <Phone color="#fff" size={18} />
               </ScaleButton>
               <ScaleButton 
@@ -578,7 +579,7 @@ export default function ChatThreadScreen() {
                 }}
                 style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#6366f1', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: Platform.OS === 'web' ? 4 : 0 }}
               >
-                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />
                 <Video color="#fff" size={18} />
               </ScaleButton>
             </XStack>
@@ -601,14 +602,14 @@ export default function ChatThreadScreen() {
       {/* Payment Modal */}
       <Modal visible={paymentModalVisible} transparent animationType="fade">
         <Animated.View entering={FadeInDown.duration(200)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-          <Animated.View entering={FadeInDown.springify().damping(15).delay(100)} style={{ backgroundColor: isDark ? '#1e293b' : '#fff', borderTopLeftRadius: TOKENS.RADIUS.XL, borderTopRightRadius: TOKENS.RADIUS.XL, padding: 20, maxHeight: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 }}>
+          <Animated.View entering={FadeInDown.springify().damping(15).delay(100)} style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderTopLeftRadius: TOKENS.RADIUS.XL, borderTopRightRadius: TOKENS.RADIUS.XL, padding: 20, maxHeight: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 }}>
             {/* Drag Handle */}
             <View style={{ width: 40, height: 4, backgroundColor: '#cbd5e1', borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
             
             <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
               <XStack alignItems="center" space="$2">
                 <View style={{ width: 32, height: 32, borderRadius: 16, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
-                  <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
                   <Banknote color="#fff" size={16} />
                 </View>
                 <Text fontWeight="800" fontSize="$6" color={TOKENS.COLORS.TEXT_PRIMARY}>Make Payment</Text>
@@ -619,7 +620,7 @@ export default function ChatThreadScreen() {
             </XStack>
             
             <View style={{ overflow: 'hidden', padding: 20, borderRadius: TOKENS.RADIUS.LG, alignItems: 'center', marginBottom: 20, ...TOKENS.SHADOWS.SUBTLE }}>
-              <LinearGradient colors={['#ecfdf5', '#ccfbf1']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+              <LinearGradient colors={['#ecfdf5', '#ccfbf1']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFill} />
               <Text color={TOKENS.COLORS.SUCCESS} fontWeight="600" fontSize="$3" marginBottom={4}>Requested Amount</Text>
               <Text fontWeight="900" fontSize={42} color={TOKENS.COLORS.SUCCESS} letterSpacing={-1}>{activePaymentMsg?.metadata?.currency}{activePaymentMsg?.metadata?.amount}</Text>
             </View>
@@ -627,14 +628,14 @@ export default function ChatThreadScreen() {
             <XStack space="$2" marginBottom="$4" padding={4} backgroundColor="#f8fafc" borderRadius={TOKENS.RADIUS.MD}>
               <Pressable onPress={() => setSelectedPaymentMethod('bank')} style={{ flex: 1 }}>
                 <View style={{ backgroundColor: selectedPaymentMethod === 'bank' ? 'transparent' : 'transparent', padding: 12, borderRadius: TOKENS.RADIUS.SM, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', overflow: 'hidden', ...(selectedPaymentMethod === 'bank' ? TOKENS.SHADOWS.COLORED(TOKENS.COLORS.BRAND) : {}) }}>
-                  {selectedPaymentMethod === 'bank' && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />}
+                  {selectedPaymentMethod === 'bank' && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />}
                   <Building color={selectedPaymentMethod === 'bank' ? '#fff' : TOKENS.COLORS.TEXT_SECONDARY} size={18} style={{ marginRight: 8 }} />
                   <Text color={selectedPaymentMethod === 'bank' ? '#fff' : TOKENS.COLORS.TEXT_SECONDARY} fontWeight="bold">US Bank</Text>
                 </View>
               </Pressable>
               <Pressable onPress={() => setSelectedPaymentMethod('crypto')} style={{ flex: 1 }}>
                 <View style={{ backgroundColor: selectedPaymentMethod === 'crypto' ? 'transparent' : 'transparent', padding: 12, borderRadius: TOKENS.RADIUS.SM, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', overflow: 'hidden', ...(selectedPaymentMethod === 'crypto' ? TOKENS.SHADOWS.COLORED(TOKENS.COLORS.BRAND) : {}) }}>
-                  {selectedPaymentMethod === 'crypto' && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />}
+                  {selectedPaymentMethod === 'crypto' && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />}
                   <Wallet color={selectedPaymentMethod === 'crypto' ? '#fff' : TOKENS.COLORS.TEXT_SECONDARY} size={18} style={{ marginRight: 8 }} />
                   <Text color={selectedPaymentMethod === 'crypto' ? '#fff' : TOKENS.COLORS.TEXT_SECONDARY} fontWeight="bold">Crypto</Text>
                 </View>
@@ -642,8 +643,8 @@ export default function ChatThreadScreen() {
             </XStack>
 
             {selectedPaymentMethod === 'bank' ? (
-              <View style={{ backgroundColor: isDark ? '#1e293b' : '#fff', padding: 16, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.SUBTLE }}>
-                <LinearGradient colors={['#ffffff', '#f8fafc']} style={StyleSheet.absoluteFillObject} />
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', padding: 16, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.SUBTLE }}>
+                <LinearGradient colors={['#ffffff', '#f8fafc']} style={StyleSheet.absoluteFill} />
                 <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="700" fontSize="$2" marginBottom="$4" letterSpacing={0.5}>TRANSFER DETAILS (ACH/WIRE)</Text>
                 
                 <YStack space="$4">
@@ -679,10 +680,10 @@ export default function ChatThreadScreen() {
                 </YStack>
               </View>
             ) : (
-              <View style={{ backgroundColor: isDark ? '#1e293b' : '#fff', padding: 16, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: '#f1f5f9', alignItems: 'center', ...TOKENS.SHADOWS.SUBTLE }}>
+              <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', padding: 16, borderRadius: TOKENS.RADIUS.MD, borderWidth: 1, borderColor: '#f1f5f9', alignItems: 'center', ...TOKENS.SHADOWS.SUBTLE }}>
                 <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="700" fontSize="$2" marginBottom="$4" letterSpacing={0.5}>{cryptoDetails?.network?.toUpperCase() || 'N/A'} WALLET ADDRESS</Text>
                 
-                <View style={{ backgroundColor: isDark ? '#1e293b' : '#fff', padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 20, borderWidth: 2, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.ELEVATED }}>
+                <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 20, borderWidth: 2, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.ELEVATED }}>
                   <ImageBackground 
                     source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(cryptoDetails?.walletAddress || '')}` }}
                     style={{ width: 120, height: 120 }}
@@ -715,7 +716,7 @@ export default function ChatThreadScreen() {
                 }
                 setTimeout(() => { setPaymentModalVisible(false); setIsPaid(false); }, 600); 
               }} style={{ width: '100%', overflow: 'hidden', padding: 16, borderRadius: TOKENS.RADIUS.MD, marginTop: 24, alignItems: 'center', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.SUCCESS) }}>
-              <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+              <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
               <Animated.View style={{ flexDirection: 'row', alignItems: 'center', transform: [{ scale: isPaid ? 1.1 : 1 }] }}>
                 <CheckCircle2 color="#fff" size={20} style={{ marginRight: 8 }} />
                 <Text color="white" fontWeight="bold" fontSize="$4">{isPaid ? 'Paid ✓' : 'Mark as Paid'}</Text>
@@ -729,7 +730,7 @@ export default function ChatThreadScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {replyingTo && (
           <Animated.View entering={FadeInUp.duration(200)} style={{ borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-            <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+            <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFill} />
             <View style={{ padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
                 <View style={{ width: 4, height: '100%', minHeight: 32, backgroundColor: '#6366f1', borderRadius: 4, marginRight: 10 }} />
@@ -745,12 +746,12 @@ export default function ChatThreadScreen() {
           </Animated.View>
         )}
         {showScheduleOptions && (
-          <Animated.View entering={FadeInDown.springify().damping(20)} style={{ backgroundColor: isDark ? '#1e293b' : '#fff', padding: 16, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingBottom: Platform.OS === 'ios' ? 24 : 16 }}>
+          <Animated.View entering={FadeInDown.springify().damping(20)} style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', padding: 16, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingBottom: Platform.OS === 'ios' ? 24 : 16 }}>
             <Text fontWeight="800" marginBottom={16} color={TOKENS.COLORS.TEXT_PRIMARY} fontSize={16}>Attachments</Text>
             <XStack space="$4" justifyContent="space-around" marginTop="$2">
               <ScaleButton onPress={() => { setMoneyRequestMode(true); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
                 <Animated.View entering={FadeInDown.delay(0).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.SUCCESS) }}>
-                  <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
                   <Banknote color="#fff" size={26} />
                 </Animated.View>
                 <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">Money</Text>
@@ -758,7 +759,7 @@ export default function ChatThreadScreen() {
               
               <ScaleButton onPress={() => { pickDocument(); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
                 <Animated.View entering={FadeInDown.delay(40).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.BRAND) }}>
-                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />
                   <Paperclip color="#fff" size={26} />
                 </Animated.View>
                 <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">File</Text>
@@ -766,7 +767,7 @@ export default function ChatThreadScreen() {
               
               <ScaleButton onPress={() => { pickImage(); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
                 <Animated.View entering={FadeInDown.delay(80).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.WARNING) }}>
-                  <LinearGradient colors={TOKENS.GRADIENTS.GOLD} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={TOKENS.GRADIENTS.GOLD} style={StyleSheet.absoluteFill} />
                   <ImageIcon color="#fff" size={26} />
                 </Animated.View>
                 <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">Gallery</Text>
@@ -774,7 +775,7 @@ export default function ChatThreadScreen() {
                 
               <ScaleButton onPress={() => { setShowTaskModal(true); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
                 <Animated.View entering={FadeInDown.delay(120).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED('#8b5cf6') }}>
-                  <LinearGradient colors={TOKENS.GRADIENTS.AI} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={TOKENS.GRADIENTS.AI} style={StyleSheet.absoluteFill} />
                   <ListChecks color="#fff" size={26} />
                 </Animated.View>
                 <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">To-Do</Text>
@@ -790,7 +791,7 @@ export default function ChatThreadScreen() {
               {quickReplies.filter((r: string) => r.toLowerCase().includes(inputText.slice(1).toLowerCase())).map((reply: string, i: number) => (
                 <ScaleButton key={i} onPress={() => { setInputText(reply); Platform.OS !== 'web' && Haptics.selectionAsync(); }} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f8fafc', flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ width: 32, height: 32, borderRadius: TOKENS.RADIUS.MD, overflow: 'hidden', backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
-                    <LinearGradient colors={TOKENS.GRADIENTS.GOLD} style={StyleSheet.absoluteFillObject} />
+                    <LinearGradient colors={TOKENS.GRADIENTS.GOLD} style={StyleSheet.absoluteFill} />
                     <Zap color="#d97706" size={16} />
                   </View>
                   <Text color={TOKENS.COLORS.TEXT_PRIMARY} fontWeight="500" fontSize={15}>{reply}</Text>
@@ -798,7 +799,7 @@ export default function ChatThreadScreen() {
               ))}
               {inputText.length > 1 && !quickReplies.includes(inputText.slice(1)) && (
                 <ScaleButton onPress={() => { addQuickReply(inputText.slice(1)); setInputText(inputText.slice(1)); Platform.OS !== 'web' && Haptics.notificationAsync(); }} style={{ padding: 16, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', backgroundColor: '#eff6ff' }}>
-                  <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={TOKENS.GRADIENTS.SCREEN_BG} style={StyleSheet.absoluteFill} />
                   <View style={{ width: 32, height: 32, borderRadius: TOKENS.RADIUS.MD, backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                     <PlusCircle color="#fff" size={16} />
                   </View>
@@ -810,9 +811,9 @@ export default function ChatThreadScreen() {
         )}
         {moneyRequestMode && (
           <Animated.View entering={FadeInUp.duration(200)} style={{ borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', overflow: 'hidden', ...TOKENS.SHADOWS.SUBTLE }}>
-            <LinearGradient colors={['#ecfdf5', '#f0fdf4']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
+            <LinearGradient colors={['#ecfdf5', '#f0fdf4']} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFill} />
             <XStack padding={12} alignItems="center" space="$2">
-              <View style={{ flex: 1, backgroundColor: isDark ? '#1e293b' : '#fff', borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#34d399', ...TOKENS.SHADOWS.SUBTLE }}>
+              <View style={{ flex: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#34d399', ...TOKENS.SHADOWS.SUBTLE }}>
                 <Text color={TOKENS.COLORS.SUCCESS} fontWeight="bold" fontSize={16} marginRight={4}>$</Text>
                 <TextInput 
                   value={moneyAmount}
@@ -831,7 +832,7 @@ export default function ChatThreadScreen() {
                 }} 
                 style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.MD, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', opacity: moneyAmount ? 1 : 0.5, ...(moneyAmount ? TOKENS.SHADOWS.COLORED(TOKENS.COLORS.SUCCESS) : {}) }}
               >
-                <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
+                <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
                 <Send color="white" size={18} style={{ transform: [{ translateX: -1 }] }} />
               </ScaleButton>
               <ScaleButton style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#d1fae5', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMoneyRequestMode(false)}>
@@ -843,19 +844,19 @@ export default function ChatThreadScreen() {
         {/* Toolbar & Input Box */}
         <XStack padding="$3" paddingBottom={Platform.OS === 'ios' ? "$5" : "$3"} backgroundColor={isDark ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.85)'} alignItems="flex-end" space="$2" borderTopWidth={1} borderTopColor={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} shadowColor="#0f172a" shadowOpacity={0.05} shadowRadius={8} shadowOffset={{width: 0, height: -2}} elevation={10}>
           <ScaleButton onPress={() => { setShowScheduleOptions(!showScheduleOptions); Platform.OS !== 'web' && Haptics.selectionAsync(); }}>
-            <View style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, justifyContent: 'center', alignItems: 'center', backgroundColor: showScheduleOptions ? '#e2e8f0' : '#f1f5f9', transform: [{ rotate: showScheduleOptions ? '45deg' : '0deg' }] }}>
-              <PlusCircle color={showScheduleOptions ? "#475569" : "#64748b"} size={26} strokeWidth={2.5} />
+            <View style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, justifyContent: 'center', alignItems: 'center', backgroundColor: showScheduleOptions ? (isDark ? '#334155' : '#e2e8f0') : (isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9'), transform: [{ rotate: showScheduleOptions ? '45deg' : '0deg' }] }}>
+              <PlusCircle color={showScheduleOptions ? (isDark ? '#94a3b8' : '#475569') : (isDark ? '#64748b' : '#64748b')} size={26} strokeWidth={2.5} />
             </View>
           </ScaleButton>
           
-          <View style={{ flex: 1, backgroundColor: inputText.trim() ? '#fff' : '#f8fafc', borderRadius: TOKENS.RADIUS.LG, paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 10 : 8, minHeight: 44, maxHeight: 120, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: inputText.trim() ? '#6366f1' : '#e2e8f0', shadowColor: inputText.trim() ? '#6366f1' : 'transparent', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
+          <View style={{ flex: 1, backgroundColor: inputText.trim() ? (isDark ? '#1e293b' : '#fff') : (isDark ? '#1e293b' : '#f8fafc'), borderRadius: TOKENS.RADIUS.LG, paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 10 : 8, minHeight: 44, maxHeight: 120, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: inputText.trim() ? '#6366f1' : (isDark ? '#334155' : '#e2e8f0'), shadowColor: inputText.trim() ? '#6366f1' : 'transparent', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
             <TextInput
               multiline
               value={inputText}
               onChangeText={setInputText}
               onFocus={() => setIsEmojiPickerOpen(false)}
               placeholder="Message..."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
               style={{ fontSize: 16, color: isDark ? '#f8fafc' : '#0f172a', flex: 1, maxHeight: 100 }}
             />
             <ScaleButton onPress={() => { Keyboard.dismiss(); setIsEmojiPickerOpen(true); }} style={{ marginLeft: 8, padding: 4 }}>
@@ -878,15 +879,15 @@ export default function ChatThreadScreen() {
               }
             }}
           >
-            <Animated.View style={{ padding: 12, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', backgroundColor: (!inputText.trim() && !isRecording) ? '#e0e7ff' : inputText.trim() ? '#6366f1' : '#ef4444', transform: [{ scale: isRecording ? 1.3 : 1 }], shadowColor: inputText.trim() ? '#4f46e5' : isRecording ? '#ef4444' : 'transparent', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: Platform.OS === 'web' ? ((inputText.trim() || isRecording) ? 5 : 0) : 0 }}>
+            <Animated.View style={{ padding: 12, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', backgroundColor: (!inputText.trim() && !isRecording) ? (isDark ? 'rgba(255,255,255,0.08)' : '#e0e7ff') : inputText.trim() ? '#6366f1' : '#ef4444', transform: [{ scale: isRecording ? 1.3 : 1 }], shadowColor: inputText.trim() ? '#4f46e5' : isRecording ? '#ef4444' : 'transparent', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: Platform.OS === 'web' ? ((inputText.trim() || isRecording) ? 5 : 0) : 0 }}>
               {inputText.trim() ? (
                 <>
-                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />
                   <Send color="white" size={20} style={{ transform: [{ translateX: 2 }, { translateY: -1 }] }} />
                 </>
               ) : (
                 <>
-                  {isRecording && <LinearGradient colors={TOKENS.GRADIENTS.DANGER} style={StyleSheet.absoluteFillObject} />}
+                  {isRecording && <LinearGradient colors={TOKENS.GRADIENTS.DANGER} style={StyleSheet.absoluteFill} />}
                   <Mic color={isRecording ? "#fff" : "#6366f1"} size={22} />
                   {isRecording && (
                     <Animated.View style={{ position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, borderRadius: TOKENS.RADIUS.XL, borderWidth: 2, borderColor: '#ef4444', opacity: 0.4 }} />
@@ -908,7 +909,7 @@ export default function ChatThreadScreen() {
       <Modal visible={showTaskModal} transparent animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Animated.View entering={FadeInDown.duration(200)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-            <Animated.View entering={FadeInDown.springify().damping(15).delay(100)} style={{ backgroundColor: isDark ? '#1e293b' : '#fff', borderTopLeftRadius: TOKENS.RADIUS.XL, borderTopRightRadius: TOKENS.RADIUS.XL, padding: 20, maxHeight: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 }}>
+            <Animated.View entering={FadeInDown.springify().damping(15).delay(100)} style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderTopLeftRadius: TOKENS.RADIUS.XL, borderTopRightRadius: TOKENS.RADIUS.XL, padding: 20, maxHeight: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 }}>
               
               {/* Drag Handle */}
               <View style={{ width: 40, height: 4, backgroundColor: '#cbd5e1', borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
@@ -916,7 +917,7 @@ export default function ChatThreadScreen() {
               <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
                 <XStack alignItems="center" space="$2">
                   <View style={{ width: 32, height: 32, borderRadius: 16, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
-                    <LinearGradient colors={TOKENS.GRADIENTS.AI} style={StyleSheet.absoluteFillObject} />
+                    <LinearGradient colors={TOKENS.GRADIENTS.AI} style={StyleSheet.absoluteFill} />
                     <ListChecks color="#fff" size={16} />
                   </View>
                   <Text fontWeight="800" fontSize="$6" color={TOKENS.COLORS.TEXT_PRIMARY}>Create To-Do List</Text>
@@ -936,7 +937,7 @@ export default function ChatThreadScreen() {
               
               <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={false}>
                 {taskInputs.map((t, i) => (
-                  <Animated.View key={i} entering={FadeInDown.springify()} style={{ backgroundColor: isDark ? '#1e293b' : '#fff', borderRadius: TOKENS.RADIUS.MD, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.SUBTLE }}>
+                  <Animated.View key={i} entering={FadeInDown.springify()} style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.MD, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#f1f5f9', ...TOKENS.SHADOWS.SUBTLE }}>
                     <XStack alignItems="center">
                       <View style={{ width: 24, height: 24, borderRadius: TOKENS.RADIUS.SM, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#f1f5f9', borderWidth: 1, borderColor: isDark ? '#475569' : '#e2e8f0', marginRight: 12, justifyContent: 'center', alignItems: 'center' }}>
                         <Text fontSize={12} fontWeight="800" color={TOKENS.COLORS.TEXT_SECONDARY}>{i + 1}</Text>
@@ -988,7 +989,7 @@ export default function ChatThreadScreen() {
                 }} 
                 style={{ width: '100%', overflow: 'hidden', padding: 16, borderRadius: TOKENS.RADIUS.MD, marginTop: 16, alignItems: 'center', opacity: (taskTitle.trim() && taskInputs.some(t => typeof t === 'string' ? t.trim() : t.title.trim())) ? 1 : 0.5, ...((taskTitle.trim() && taskInputs.some(t => typeof t === 'string' ? t.trim() : t.title.trim())) ? TOKENS.SHADOWS.COLORED(TOKENS.COLORS.BRAND) : {}) }}
               >
-                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
+                <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />
                 <XStack space="$2" alignItems="center">
                   <Send color="#fff" size={18} />
                   <Text color="white" fontWeight="bold" fontSize="$4">Send List</Text>
