@@ -1,3 +1,4 @@
+import { GradientBackground } from '../../src/components/ThemeComponents';
 import { TOKENS } from '../../src/theme/tokens';
 import { useThemeContext } from '../../src/context/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -413,7 +414,7 @@ export default function ContactsScreen() {
     const avatarStatus = isOnline ? 'online' : isNonUnicom ? 'non-unicom' : 'offline';
 
     return (
-      <Animated.View key={contact.id ? contact.id + "-" + index : index} entering={SlideInRight.delay(index * 60).springify().damping(15)} style={[styles.cardContainer, isNonUnicom && styles.cardContainerNonUnicom]}>
+      <Animated.View key={contact.id ? contact.id + "-" + index : index} entering={FadeInUp.duration(200)} style={[styles.cardContainer, isNonUnicom && styles.cardContainerNonUnicom]}>
         <LinearGradient 
           colors={isDark ? ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)'] : ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']} 
           start={{x:0, y:0}} end={{x:0, y:1}} style={StyleSheet.absoluteFillObject} />
@@ -478,24 +479,7 @@ export default function ContactsScreen() {
   const styles = getStyles(isDark);
 
   return (
-    <View style={styles.container}>
-      {/* === FULL-SCREEN THEME-ADAPTIVE GRADIENT (Option A — Clean) === */}
-      <LinearGradient
-        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
-        locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-
-      {/* Background Particles */}
-      <View style={[StyleSheet.absoluteFillObject, { zIndex: 1, pointerEvents: 'none' }]}>
-        <Animated.View style={[styles.particle, { backgroundColor: '#8b5cf6', top: 380, left: 20, width: 8, height: 8 }, p1Style]} />
-        <Animated.View style={[styles.particle, { backgroundColor: '#06b6d4', top: 580, right: 30, width: 12, height: 12 }, p2Style]} />
-        <Animated.View style={[styles.particle, { backgroundColor: '#ec4899', top: 780, left: 40, width: 6, height: 6 }, p3Style]} />
-        <Animated.View style={[styles.particle, { backgroundColor: '#3b82f6', top: 480, right: 60, width: 9, height: 9 }, p4Style]} />
-        <Animated.View style={[styles.particle, { backgroundColor: '#a855f7', top: 680, left: 80, width: 10, height: 10 }, p5Style]} />
-      </View>
-
+    <GradientBackground style={styles.container}>
       {/* Top Fixed Section */}
       <View style={{ paddingTop: insets.top + 10, zIndex: 10, paddingBottom: 10 }}>
         {/* Search Bar */}
@@ -587,7 +571,7 @@ export default function ContactsScreen() {
       )}
 
 
-    </View>
+    </GradientBackground>
   );
 }
 
@@ -650,7 +634,7 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
   },
   cardContainer: {
     marginBottom: 12,
-    backgroundColor: Platform.OS === 'web' ? 'transparent' : (isDark ? '#1e293b' : '#ffffff'),
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.7)',
     borderRadius: 18,
     borderWidth: 1.5,
     borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(199,210,254,0.7)',
@@ -659,7 +643,7 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: isDark ? 0.25 : 0.18,
     shadowRadius: 20,
-    elevation: Platform.OS === 'web' ? 8 : 2,
+    elevation: 0,
   },
   cardContainerNonUnicom: {
     /* opacity: 0.85 */

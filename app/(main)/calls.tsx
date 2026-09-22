@@ -1,3 +1,4 @@
+import { GradientBackground } from '../../src/components/ThemeComponents';
 import { TOKENS } from '../../src/theme/tokens';
 import { useThemeContext } from '../../src/context/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -44,10 +45,7 @@ const AnimatedAvatarRing = ({ children, callType }: { children: React.ReactNode,
   const ringRotation = useSharedValue(0);
   
   useEffect(() => {
-    ringRotation.value = withRepeat(
-      withTiming(360, { duration: callType === 'missed' ? 3000 : 6000, easing: Easing.linear }),
-      -1, false
-    );
+    // Removed animation for performance
   }, []);
 
   const ringStyle = useAnimatedStyle(() => ({
@@ -151,6 +149,7 @@ const FilterButton = ({ label, type, activeFilter, onSelect, gradientColors }: a
 };
 
 const LoadingSkeleton = () => {
+  const { isDark } = useThemeContext();
   const shimmerOpacity = useSharedValue(0.4);
   useEffect(() => {
     shimmerOpacity.value = withRepeat(
@@ -162,7 +161,7 @@ const LoadingSkeleton = () => {
   return (
     <YStack paddingHorizontal="$4" paddingTop="$4" space="$4">
       {[1, 2, 3, 4].map(i => (
-        <Animated.View key={i} style={[animatedStyle, { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 24, padding: 16, marginBottom: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' }]} >
+        <Animated.View key={i} style={[animatedStyle, { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, backgroundColor: isDark ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.85)', borderRadius: 24, padding: 16, marginBottom: 12, borderWidth: 1.5, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.6)' }]} >
           <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(226,232,240,0.5)' }} />
           <YStack flex={1} marginLeft="$4" space="$2">
             <View style={{ width: 140, height: 18, borderRadius: 6, backgroundColor: 'rgba(226,232,240,0.5)' }} />
@@ -341,7 +340,7 @@ export default function CallsScreen() {
     }
 
     return (
-      <Animated.View key={log.id} entering={SlideInRight.delay(index * 60).springify().damping(15)} style={[styles.cardContainer, isMissed && styles.cardContainerMissed]}>
+      <Animated.View key={log.id} entering={FadeInUp.duration(200)} style={[styles.cardContainer, isMissed && styles.cardContainerMissed]}>
         {/* Glassmorphic Gradient Background — theme-adaptive */}
         <LinearGradient 
           colors={isDark ? ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)'] : ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']} 
@@ -406,15 +405,7 @@ export default function CallsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* === FULL-SCREEN THEME-ADAPTIVE GRADIENT (Option A — Clean) === */}
-      <LinearGradient
-        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
-        locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-
+    <GradientBackground style={styles.container}>
       {/* Top Fixed Section (Search + Filters) */}
       <View style={{ paddingTop: insets.top + 10, zIndex: 10, paddingBottom: 10 }}>
         {/* Search Bar */}
@@ -511,7 +502,7 @@ export default function CallsScreen() {
           </Animated.View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </GradientBackground>
   );
 }
 
@@ -585,7 +576,7 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
   // ── THEME-ADAPTIVE CARD STYLES ──
   cardContainer: {
     marginBottom: 8,
-    backgroundColor: Platform.OS === 'web' ? 'transparent' : (isDark ? '#1e293b' : '#ffffff'),
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.7)',
     borderRadius: 18,
     borderWidth: 1.5,
     borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(199,210,254,0.7)',
@@ -594,7 +585,7 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: isDark ? 0.25 : 0.18,
     shadowRadius: 20,
-    elevation: Platform.OS === 'web' ? 8 : 2,
+    elevation: 0,
   },
   cardContainerMissed: {
     borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : '#fca5a5',
@@ -644,7 +635,7 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
   callBackText: {
     fontSize: 12,
     fontWeight: '700',
-    color: isDark ? '#e2e8f0' : '#6366f1',
+    color: isDark ? '#818cf8' : '#6366f1',
   },
   deleteActionContainer: {
     width: 100,

@@ -11,10 +11,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { TOKENS } from '../../../src/theme/tokens';
 import * as Haptics from 'expo-haptics';
 
-const { width } = Dimensions.get('window');
-const THUMB_SIZE = (width - 24) / 3;
+
+
+import { useWindowDimensions } from 'react-native';
 
 export default function SharedMediaScreen() {
+  const { width } = useWindowDimensions();
+  const THUMB_SIZE = (Math.min(width, 420) - 24) / 3;
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { isDark } = useThemeContext();
@@ -57,7 +60,7 @@ export default function SharedMediaScreen() {
 
   const renderMediaItem = ({ item }) => (
     <TouchableOpacity onPress={() => openUrl(item.mediaUrl)}>
-      <Image source={{ uri: item.mediaUrl }} style={styles.mediaThumb} />
+      <Image source={{ uri: item.mediaUrl }} style={[styles.mediaThumb, { width: THUMB_SIZE, height: THUMB_SIZE }]} />
     </TouchableOpacity>
   );
 
@@ -160,7 +163,7 @@ const styles = StyleSheet.create({
   activeTabText: { color: '#0ea5e9' },
   content: { flex: 1 },
   mediaList: { padding: 4 },
-  mediaThumb: { width: THUMB_SIZE, height: THUMB_SIZE, margin: 4, borderRadius: 8, backgroundColor: '#cbd5e1' },
+  mediaThumb: { margin: 4, borderRadius: 8, backgroundColor: '#cbd5e1' },
   listContainer: { padding: 16, gap: 12 },
   docItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12 },
   docIcon: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' },

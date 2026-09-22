@@ -3,6 +3,7 @@ import { View, Alert, TextInput, ActivityIndicator, TouchableOpacity, Text as RN
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useThemeContext } from '../../src/context/ThemeContext';
+import { GradientBackground } from '../../src/components/ThemeComponents';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming, withRepeat } from 'react-native-reanimated';
@@ -161,29 +162,17 @@ export default function OtpScreen() {
   const isComplete = digits.join('').length === 6;
 
   return (
-    <View style={styles.container}>
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
-        locations={[0, 0.5, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-      
-      {/* Background Blobs (Different positions from Login) */}
-      
-      
+    <GradientBackground style={styles.container}>
       
       {/* Header / Back Navigation */}
       <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <BlurView intensity={40} tint="light" style={[StyleSheet.absoluteFillObject, { borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden' }]} />
+          <BlurView intensity={40} tint="light" style={[StyleSheet.absoluteFill, { borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden' }]} />
           <ChevronLeft color="#ffffff" size={24} />
         </TouchableOpacity>
         
         <View style={styles.logoContainer}>
-          <BlurView intensity={40} tint="light" style={[StyleSheet.absoluteFillObject, { borderRadius: 40, overflow: 'hidden' }]} />
+          <BlurView intensity={40} tint="light" style={[StyleSheet.absoluteFill, { borderRadius: 40, overflow: 'hidden' }]} />
           <Image 
             source={require('../../assets/images/logo-icon-transparent.png')} 
             style={styles.logo} 
@@ -206,7 +195,7 @@ export default function OtpScreen() {
               </View>
               <RNText style={[styles.title, { color: isDark ? '#ffffff' : '#0f172a' }]}>Verification Code</RNText>
               <RNText style={[styles.subtitle, { color: isDark ? 'rgba(255,255,255,0.8)' : '#475569' }]}>
-                Enter the OTP sent to <RNText style={styles.boldPhone}>{phone}</RNText>
+                Enter the OTP sent to <RNText style={[styles.boldPhone, { color: isDark ? "#ffffff" : "#0f172a" }]}>{phone}</RNText>
               </RNText>
             </Animated.View>
 
@@ -220,19 +209,19 @@ export default function OtpScreen() {
                   {digits.map((digit, index) => (
                     <View key={index} style={[styles.otpBoxWrapper, activeBox === index && styles.otpBoxWrapperActive]}>
                       <TextInput
-                        ref={el => inputRefs.current[index] = el!}
+                        ref={(el: TextInput | null) => { if (el) inputRefs.current[index] = el; }}
                         style={[
                           styles.otpInput,
-                          activeBox === index && styles.otpInputActive,
-                          digit !== '' && styles.otpInputFilled
+                          activeBox === index ? styles.otpInputActive : null,
+                          digit !== '' ? styles.otpInputFilled : null
                         ]}
                         value={digit}
                         onChangeText={(text) => handleChangeText(text, index)}
                         onKeyPress={(e) => handleKeyPress(e, index)}
                         onFocus={() => setActiveBox(index)}
                         keyboardType="number-pad"
-                        maxLength={6} // Allow paste up to 6
-                        selectTextOnFocus
+                        maxLength={1} // Allow paste up to 6
+                        
                       />
                     </View>
                   ))}
@@ -288,7 +277,7 @@ export default function OtpScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </GradientBackground>
   );
 }
 
@@ -310,7 +299,7 @@ const styles = StyleSheet.create({
     shadowColor: '#fff',
     shadowOpacity: 1,
     shadowRadius: 100,
-    elevation: 20,
+    elevation: Platform.OS === 'web' ? 20 : 0,
   },
   blob2: {
     width: 350,
@@ -321,7 +310,7 @@ const styles = StyleSheet.create({
     shadowColor: '#0ff',
     shadowOpacity: 1,
     shadowRadius: 100,
-    elevation: 20,
+    elevation: Platform.OS === 'web' ? 20 : 0,
   },
   header: {
     flexDirection: 'row',
@@ -434,7 +423,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: Platform.OS === 'web' ? 4 : 0,
     transform: [{ scale: 1.05 }],
   },
   otpInput: {
@@ -478,7 +467,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: Platform.OS === 'web' ? 8 : 0,
   },
   button: {
     height: 56,

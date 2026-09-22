@@ -126,6 +126,18 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     
     socket.on('message:received', handleNewMessage);
     
+    const handleReactionUpdate = ({ messageId, reactions }) => {
+      setMessages(prev => {
+        const newState = { ...prev };
+        for (const chatId in newState) {
+          newState[chatId] = newState[chatId].map(m => m.id === messageId ? { ...m, reactions } : m);
+        }
+        return newState;
+      });
+    };
+    
+    socket.on('message:reaction_update', handleReactionUpdate);
+
     const handleStatusUpdate = ({ messageId, status }) => {
       setMessages(prev => {
         const newState = { ...prev };
@@ -140,6 +152,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       socket.off('message:received', handleNewMessage);
       socket.off('message:status_update', handleStatusUpdate);
+      socket.off('message:reaction_update', handleReactionUpdate);
     };
   }, [user, socket]);
   

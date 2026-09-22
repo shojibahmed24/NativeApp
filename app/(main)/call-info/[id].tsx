@@ -5,8 +5,8 @@ import { ScrollView, TouchableOpacity, View, StyleSheet, Platform, TouchableHigh
 import { YStack, XStack, Text, Avatar } from 'tamagui';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, MessageSquare, Phone, Video, PhoneMissed, PhoneIncoming, PhoneOutgoing, MoreVertical, Sparkles, PhoneOff, User, Copy, Ban, Trash2, X } from 'lucide-react-native';
-import { GradientBackground, GlassCard } from '../../../src/components/ThemeComponents';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { GradientBackground } from '../../../src/components/ThemeComponents';
+import { TOKENS } from '../../../src/theme/tokens';
 import { useCall } from '../../../src/context/CallContext';
 import { supabase } from '../../../src/services/supabase';
 import { api } from '../../../src/services/api';
@@ -14,8 +14,6 @@ import { useAuth } from '../../../src/context/AuthContext';
 import Animated, { FadeInUp, FadeInDown, SlideInRight, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { TOKENS } from '../../../src/theme/tokens';
-
 
 const AVATAR_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6'];
 const getAvatarColor = (name: string) => {

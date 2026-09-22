@@ -86,7 +86,7 @@ export const registerForPushNotificationsAsync = async () => {
       
       await api.request('/users/push-token', { method: 'POST', body: JSON.stringify({ pushToken: token, isVoip: false }) });
     } catch (e) {
-      console.error('Error fetching Expo Push Token:', e);
+      console.log('Silent Warning: Error fetching Expo Push Token:', e.message);
     }
   }
 

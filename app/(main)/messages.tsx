@@ -1,3 +1,4 @@
+import { GradientBackground } from '../../src/components/ThemeComponents';
 import { TOKENS } from '../../src/theme/tokens';
 import { useThemeContext } from '../../src/context/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -149,7 +150,7 @@ const EmptyPulseIcon = ({ isSearch }: { isSearch: boolean }) => {
   }, []);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
-    <Animated.View style={[style, { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }]}>
+    <Animated.View style={[style, { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#6366f1', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: Platform.OS === 'web' ? 6 : 0 }]}>
       <LinearGradient colors={['#e0e7ff', '#fae8ff']} style={StyleSheet.absoluteFillObject} />
       {isSearch ? <Search color="#6366f1" size={32} /> : <MessageSquare color="#6366f1" size={32} style={{ zIndex: 1 }} />}
     </Animated.View>
@@ -205,7 +206,7 @@ const FilterButton = ({ label, type, activeFilter, onSelect, gradientColors }: a
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.5,
             shadowRadius: 10,
-            elevation: 8,
+            elevation: Platform.OS === 'web' ? 8 : 0,
           },
           animatedStyle
         ]}
@@ -382,11 +383,11 @@ export default function MessagesScreen() {
     const avatarStatus = isOnline ? 'online' : isUnread ? 'unread' : 'offline';
 
     return (
-      <Animated.View key={conv.chatId || contact.id} entering={SlideInRight.delay(index * 60).springify().damping(15)} style={[styles.cardContainer, isUnread && styles.cardContainerUnread]}>
+      <Animated.View key={conv.chatId || contact.id} entering={FadeInUp.duration(200)} style={[styles.cardContainer, isUnread && styles.cardContainerUnread]}>
         {/* Glassmorphic Gradient Background — theme-adaptive */}
         {!isUnread && (
           <LinearGradient 
-            colors={isDark ? ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)'] : ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']} 
+            colors={isDark ? ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)'] : ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']} 
             start={{x:0, y:0}} end={{x:0, y:1}} style={StyleSheet.absoluteFillObject} />
         )}
         
@@ -443,24 +444,7 @@ export default function MessagesScreen() {
   const styles = getStyles(isDark);
 
   return (
-    <View style={styles.container}>
-      {/* === FULL-SCREEN THEME-ADAPTIVE GRADIENT (Option A — Clean) === */}
-      <LinearGradient
-        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
-        locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-
-      {/* Background Particles */}
-      <View style={[StyleSheet.absoluteFillObject, { zIndex: 1, pointerEvents: 'none' }]}>
-        <Animated.View style={[styles.particle, { backgroundColor: '#8b5cf6', top: 380, left: 20, width: 8, height: 8 }, p1Style]} />
-        <Animated.View style={[styles.particle, { backgroundColor: '#06b6d4', top: 580, right: 30, width: 12, height: 12 }, p2Style]} />
-        <Animated.View style={[styles.particle, { backgroundColor: '#ec4899', top: 780, left: 40, width: 6, height: 6 }, p3Style]} />
-        <Animated.View style={[styles.particle, { backgroundColor: '#3b82f6', top: 480, right: 60, width: 9, height: 9 }, p4Style]} />
-        <Animated.View style={[styles.particle, { backgroundColor: '#a855f7', top: 680, left: 80, width: 10, height: 10 }, p5Style]} />
-      </View>
-
+    <GradientBackground style={styles.container}>
       {/* Top Fixed Section (Search + Filters) */}
       <View style={{ paddingTop: insets.top + 10, zIndex: 10, paddingBottom: 10 }}>
         {/* Search Bar */}
@@ -473,7 +457,7 @@ export default function MessagesScreen() {
             shadowOffset: { width: 0, height: isSearchFocused ? 6 : 4 },
             shadowOpacity: isSearchFocused ? (isDark ? 0.3 : 0.2) : (isDark ? 0 : 0.1),
             shadowRadius: isSearchFocused ? 16 : 12,
-            elevation: isDark ? 0 : 4,
+            elevation: Platform.OS === 'web' ? (isDark ? 0 : 4) : 0,
           }]}>
             <Image source={require('../../assets/images/logo-icon-transparent.png')} style={{ width: 28, height: 28, marginLeft: 16 }} />
             <TextInput
@@ -531,7 +515,7 @@ export default function MessagesScreen() {
       )}
 
 
-    </View>
+    </GradientBackground>
   );
 }
 
@@ -591,7 +575,7 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
   // ── THEME-ADAPTIVE CARD STYLES ──
   cardContainer: {
     marginBottom: 8,
-    backgroundColor: Platform.OS === 'web' ? 'transparent' : (isDark ? '#1e293b' : '#ffffff'),
+    backgroundColor: isDark ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.7)',
     borderRadius: 18,
     borderWidth: 1,
     borderColor: isDark ? '#334155' : '#e2e8f0',
@@ -600,10 +584,10 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: isDark ? 0.25 : 0.18,
     shadowRadius: 20,
-    elevation: Platform.OS === 'web' ? 8 : 2,
+    elevation: 0,
   },
   cardContainerUnread: {
-    backgroundColor: isDark ? '#1a2436' : '#f0f9ff',
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
     borderColor: isDark ? '#0284c7' : '#bae6fd',
   },
   rowInner: {
@@ -623,7 +607,7 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: Platform.OS === 'web' ? 5 : 0,
   },
   particle: {
     position: 'absolute',
@@ -647,7 +631,7 @@ function getStyles(isDark: boolean) { return StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 16,
-    elevation: 10,
+    elevation: Platform.OS === 'web' ? 10 : 0,
   },
   fabInner: {
     width: 62,

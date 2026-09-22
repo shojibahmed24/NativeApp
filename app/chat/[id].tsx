@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GradientBackground } from '../../src/components/ThemeComponents';
 import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedEmoji from '../../src/components/AnimatedEmoji';
+import ReactionPicker from '../../src/components/ReactionPicker';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInUp, FadeInDown, Layout, useSharedValue, useAnimatedStyle, withTiming, FadeOutDown } from 'react-native-reanimated';
 import { useChat } from '../../src/context/ChatContext';
@@ -67,6 +68,7 @@ export default function ChatThreadScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState<AudioRecorder | null>(null);
   const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [reactionMsgId, setReactionMsgId] = useState<string | null>(null);
   const [translatedMessages, setTranslatedMessages] = useState<Record<string, boolean>>({});
   const [showScheduleOptions, setShowScheduleOptions] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -336,7 +338,7 @@ export default function ChatThreadScreen() {
               shadowOpacity: msg.isSender ? 0.3 : 0.08,
               shadowRadius: 10,
               shadowOffset: { width: 0, height: 4 },
-              elevation: msg.isSender ? 2 : 1,
+              elevation: Platform.OS === 'web' ? (msg.isSender ? 2 : 1) : 0,
               borderRadius: TOKENS.RADIUS.LG,
               borderBottomRightRadius: msg.isSender ? 4 : 24,
               borderBottomLeftRadius: msg.isSender ? 24 : 4,
@@ -394,7 +396,7 @@ export default function ChatThreadScreen() {
                       <FileText color={msg.isSender ? '#3b82f6' : '#fff'} size={20} />
                     </View>
                     <YStack flex={1}>
-                      <Text color={msg.isSender ? '#fff' : '#0f172a'} numberOfLines={1} fontWeight="bold">{msg.fileName || 'Document'}</Text>
+                      <Text color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#0f172a')} numberOfLines={1} fontWeight="bold">{msg.fileName || 'Document'}</Text>
                       <Text color={msg.isSender ? 'rgba(255,255,255,0.8)' : '#64748b'} fontSize={12} marginTop={2}>FILE ATTACHMENT</Text>
                     </YStack>
                   </View>
@@ -452,7 +454,7 @@ export default function ChatThreadScreen() {
                                <View style={{ width: 24, height: 24, borderRadius: TOKENS.RADIUS.SM, borderWidth: 2, borderColor: task.done ? '#6366f1' : '#cbd5e1', backgroundColor: task.done ? '#6366f1' : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
                                   {task.done && <Check color="#fff" size={14} strokeWidth={3.5} />}
                                </View>
-                               <Text color={task.done ? '#94a3b8' : '#0f172a'} fontWeight={task.done ? "500" : "600"} style={{ textDecorationLine: task.done ? 'line-through' : 'none', flex: 1 }}>{task.title}</Text>
+                               <Text color={task.done ? '#94a3b8' : (isDark ? '#f8fafc' : '#0f172a')} fontWeight={task.done ? "500" : "600"} style={{ textDecorationLine: task.done ? 'line-through' : 'none', flex: 1 }}>{task.title}</Text>
                                  {task.price > 0 && (
                                     <Text color={TOKENS.COLORS.SUCCESS} fontWeight="800" fontSize={13} style={{ marginLeft: 8 }}>${task.price}</Text>
                                  )}
@@ -464,7 +466,7 @@ export default function ChatThreadScreen() {
                   )}
                 {msg.type === 'checklist' && msg.metadata && (
                   <View style={{ backgroundColor: msg.isSender ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.08)', padding: 14, borderRadius: TOKENS.RADIUS.MD, marginBottom: 10, minWidth: 200 }}>
-                    <Text fontWeight="800" marginBottom="$3" color={msg.isSender ? '#fff' : '#0f172a'}>{msg.text}</Text>
+                    <Text fontWeight="800" marginBottom="$3" color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#0f172a')}>{msg.text}</Text>
                     {msg.metadata.items.map((item: any) => (
                       <ScaleButton key={item.id} onPress={() => { toggleChecklistItem(id as string, msg.id, item.id); }} style={{ paddingVertical: 4 }}>
                         <XStack space="$3" alignItems="center" marginBottom="$2">
@@ -507,17 +509,16 @@ export default function ChatThreadScreen() {
   };
   const renderBackground = (children: React.ReactNode) => {
     return (
-      <View style={{ flex: 1 }}>
-        <LinearGradient colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+      <GradientBackground style={{ flex: 1 }}>
         {children}
-      </View>
+      </GradientBackground>
     );
   };
 
   return renderBackground(
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
       <View style={{ backgroundColor: 'transparent', zIndex: 10 }}>
-        <LinearGradient colors={isDark ? ['rgba(30,41,59,0.98)', 'rgba(30,41,59,0.92)'] : ['rgba(255,255,255,0.98)', 'rgba(255,255,255,0.92)']} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={isDark ? ['rgba(30,41,59,0.85)', 'rgba(30,41,59,0.75)'] : ['rgba(255,255,255,0.98)', 'rgba(255,255,255,0.92)']} style={StyleSheet.absoluteFillObject} />
         <XStack padding="$3" paddingTop="$5" paddingBottom="$3" alignItems="center" justifyContent="space-between" shadowColor="#0f172a" shadowOpacity={0.12} shadowRadius={12} shadowOffset={{ width: 0, height: 6 }} elevation={8} borderBottomWidth={1} borderBottomColor={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}>
           <XStack space="$3" alignItems="center">
             <ScaleButton onPress={() => router.canGoBack() ? router.back() : router.replace('/(main)/messages')} style={{ width: 40, height: 40, backgroundColor: isDark ? '#1e293b' : '#fff', borderRadius: TOKENS.RADIUS.LG, justifyContent: 'center', alignItems: 'center', ...TOKENS.SHADOWS.SUBTLE }}>
@@ -535,7 +536,7 @@ export default function ChatThreadScreen() {
                   )}
                 </View>
                 {onlineUsers[id as string] && (
-                  <View style={{ position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10b981', borderWidth: 2, borderColor: '#fff', shadowColor: '#10b981', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4, elevation: 2 }} />
+                  <View style={{ position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10b981', borderWidth: 2, borderColor: '#fff', shadowColor: '#10b981', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4, elevation: Platform.OS === 'web' ? 2 : 0 }} />
                 )}
               </View>
               <YStack marginLeft="$3">
@@ -560,7 +561,7 @@ export default function ChatThreadScreen() {
                     console.error(e);
                   }
                 }}
-                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#10b981', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
+                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#10b981', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: Platform.OS === 'web' ? 4 : 0 }}
               >
                 <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFillObject} />
                 <Phone color="#fff" size={18} />
@@ -575,7 +576,7 @@ export default function ChatThreadScreen() {
                     console.error(e);
                   }
                 }}
-                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#6366f1', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#6366f1', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#6366f1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: Platform.OS === 'web' ? 4 : 0 }}
               >
                 <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />
                 <Video color="#fff" size={18} />
@@ -840,7 +841,7 @@ export default function ChatThreadScreen() {
           </Animated.View>
         )}
         {/* Toolbar & Input Box */}
-        <XStack padding="$3" paddingBottom={Platform.OS === 'ios' ? "$5" : "$3"} backgroundColor={isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)'} alignItems="flex-end" space="$2" borderTopWidth={1} borderTopColor={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} shadowColor="#0f172a" shadowOpacity={0.05} shadowRadius={8} shadowOffset={{width: 0, height: -2}} elevation={10}>
+        <XStack padding="$3" paddingBottom={Platform.OS === 'ios' ? "$5" : "$3"} backgroundColor={isDark ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.85)'} alignItems="flex-end" space="$2" borderTopWidth={1} borderTopColor={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} shadowColor="#0f172a" shadowOpacity={0.05} shadowRadius={8} shadowOffset={{width: 0, height: -2}} elevation={10}>
           <ScaleButton onPress={() => { setShowScheduleOptions(!showScheduleOptions); Platform.OS !== 'web' && Haptics.selectionAsync(); }}>
             <View style={{ width: 44, height: 44, borderRadius: TOKENS.RADIUS.LG, justifyContent: 'center', alignItems: 'center', backgroundColor: showScheduleOptions ? '#e2e8f0' : '#f1f5f9', transform: [{ rotate: showScheduleOptions ? '45deg' : '0deg' }] }}>
               <PlusCircle color={showScheduleOptions ? "#475569" : "#64748b"} size={26} strokeWidth={2.5} />
@@ -877,7 +878,7 @@ export default function ChatThreadScreen() {
               }
             }}
           >
-            <Animated.View style={{ padding: 12, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', backgroundColor: (!inputText.trim() && !isRecording) ? '#e0e7ff' : inputText.trim() ? '#6366f1' : '#ef4444', transform: [{ scale: isRecording ? 1.3 : 1 }], shadowColor: inputText.trim() ? '#4f46e5' : isRecording ? '#ef4444' : 'transparent', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: (inputText.trim() || isRecording) ? 5 : 0 }}>
+            <Animated.View style={{ padding: 12, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', backgroundColor: (!inputText.trim() && !isRecording) ? '#e0e7ff' : inputText.trim() ? '#6366f1' : '#ef4444', transform: [{ scale: isRecording ? 1.3 : 1 }], shadowColor: inputText.trim() ? '#4f46e5' : isRecording ? '#ef4444' : 'transparent', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: Platform.OS === 'web' ? ((inputText.trim() || isRecording) ? 5 : 0) : 0 }}>
               {inputText.trim() ? (
                 <>
                   <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFillObject} />

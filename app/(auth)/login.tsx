@@ -9,7 +9,7 @@ import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Phone, ArrowRight, Lock, ShieldCheck, ChevronDown, X } from 'lucide-react-native';
 import { TOKENS } from '../../src/theme/tokens';
-
+import { GradientBackground } from '../../src/components/ThemeComponents';
 
 const { width } = Dimensions.get('window');
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -35,29 +35,63 @@ export default function LoginScreen() {
   
   const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { isDark } = useThemeContext();
   const router = useRouter();
-  const { loginWithPhone } = useAuth();
+  const { loginWithPhone, checkUser } = useAuth();
+  const { isDark } = useThemeContext();
   
   const buttonScale = useSharedValue(1);
 
   const handleSendOtp = async () => {
-    if (!phone || phone.length < 6) {
-      Alert.alert('Error', 'Please enter a valid phone number');
+    if (!phone) {
+      Alert.alert('Error', 'Please enter a phone number');
       return;
     }
     
+    // Clean up the phone input (remove spaces, dashes, etc.)
+    let cleanPhone = phone.replace(/[^0-9]/g, '');
+    
+    // If the country dial is +880 and user typed a leading 0, strip it
+    if (selectedCountry.dial === '+880' && cleanPhone.startsWith('0')) {
+      cleanPhone = cleanPhone.substring(1);
+    }
+    
+    const fullNumber = `${selectedCountry.dial}${cleanPhone}`;
+    
+    // Bangladesh specific validation (+880 + 10 digits = 14 characters)
+    if (fullNumber.startsWith('+880')) {
+      if (fullNumber.length !== 14) {
+        Alert.alert('Invalid Number', 'Bangladeshi phone numbers must be 11 digits (e.g. 01712345678).');
+        return;
+      }
+    } else if (fullNumber.length < 10 || fullNumber.length > 16) {
+      Alert.alert('Invalid Number', 'Please enter a valid international phone number.');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const fullNumber = `${selectedCountry.dial}${phone}`;
-      const res = await loginWithPhone(fullNumber, 'sms');
-      if (res.devOtp) {
-        Alert.alert('DEV MODE OTP', `Your test OTP is: ${res.devOtp}`);
-        console.log('%c[DEV OTP] Your test OTP is: ' + res.devOtp, 'color: #005eb8; font-size: 16px; font-weight: bold;');
+      // Check if user exists
+      const checkRes = await checkUser(fullNumber);
+      
+      if (checkRes.exists) {
+        if (checkRes.hasPassword) {
+          // Navigate to password screen
+          router.push({ pathname: '/(auth)/password', params: { phone: fullNumber } });
+        } else {
+          // Legacy user with no password, send OTP
+          const res = await loginWithPhone(fullNumber, 'sms');
+          if (res && res.otpCode) { console.log('%c [DEV OTP RECEIVED]: ' + res.otpCode, 'color: #00ff00; font-size: 16px; font-weight: bold;'); }
+          router.push({ pathname: '/(auth)/otp', params: { phone: fullNumber } });
+        }
+      } else {
+        // New user, send OTP for registration
+        const res = await loginWithPhone(fullNumber, 'sms');
+        if (res && res.otpCode) { console.log('%c [DEV OTP RECEIVED]: ' + res.otpCode, 'color: #00ff00; font-size: 16px; font-weight: bold;'); }
+        router.push({ pathname: '/(auth)/otp', params: { phone: fullNumber } });
       }
-      router.push({ pathname: '/(auth)/otp', params: { phone: fullNumber } });
+      
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send OTP');
+      Alert.alert('Error', error.message || 'Failed to check user');
     } finally {
       setIsLoading(false);
     }
@@ -78,20 +112,7 @@ export default function LoginScreen() {
   });
 
   return (
-    <View style={styles.container}>
-      {/* Deep Rich Gradient Background */}
-      <LinearGradient
-        colors={isDark ? TOKENS.GRADIENTS.DARK_BG : TOKENS.GRADIENTS.LIGHT_BG}
-        locations={[0, 0.5, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-      
-      {/* Background Blobs (No full screen BlurView so we keep the rich colors) */}
-      
-      
-      
+    <GradientBackground style={styles.container}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           
@@ -104,11 +125,9 @@ export default function LoginScreen() {
                 <View style={styles.logoShadow}>
                   {/* Made the logo container bigger and the logo bigger */}
                   <View style={styles.logoContainer}>
-                    <BlurView intensity={40} tint="light" style={[StyleSheet.absoluteFillObject, { borderRadius: 80, overflow: 'hidden' }]} />
                     <Image 
-                      source={require('../../assets/images/logo-icon-transparent.png')} 
+                      source={require('../../assets/images/logo.jpg')} 
                       style={styles.logo} 
-                      resizeMode="contain" 
                     />
                   </View>
                 </View>
@@ -118,23 +137,23 @@ export default function LoginScreen() {
                     <ShieldCheck size={14} color="#005eb8" />
                     <RNText style={styles.badgeText}>End-to-End Encrypted</RNText>
                   </View>
-                  <RNText style={[styles.tagline, { color: isDark ? '#ffffff' : '#0f172a', textShadowColor: isDark ? 'rgba(0,0,0,0.4)' : 'transparent' }]}>Premium Chat & Call Translation</RNText>
+                  <RNText style={styles.tagline}>Premium Chat & Call Translation</RNText>
                 </Animated.View>
               </Animated.View>
 
               {/* Form Card */}
               <Animated.View entering={FadeInUp.duration(700).delay(500).springify()}>
-                <View style={[styles.formCard, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}>
+                <View style={styles.formCard}>
                   {/* Top floating accent */}
-                  <View style={styles.cardAccent} />
+                  {/* <View style={styles.cardAccent} /> removed */}
                   
                   <View style={styles.inputSection}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                       <Phone size={14} color="#334155" style={{ marginRight: 6 }} />
-                      <RNText style={[styles.label, { color: isDark ? '#f8fafc' : '#334155' }]}>Phone Number</RNText>
+                      <RNText style={styles.label}>Phone Number</RNText>
                     </View>
                     
-                    <View style={[styles.inputContainer, isFocused && styles.inputFocused, { backgroundColor: isDark ? '#0f172a' : '#f8fafc', borderColor: isDark ? '#334155' : '#e2e8f0' }]}>
+                    <View style={[styles.inputContainer, isFocused && styles.inputFocused]}>
                       
                       {/* Interactive Country Chip */}
                       <TouchableOpacity 
@@ -149,7 +168,7 @@ export default function LoginScreen() {
                       </TouchableOpacity>
                       
                       <TextInput 
-                        style={[styles.input, { color: isDark ? '#f8fafc' : '#0f172a' }]}
+                        style={styles.input}
                         placeholder="1700000000" 
                         placeholderTextColor="#94a3b8"
                         value={phone}
@@ -174,7 +193,7 @@ export default function LoginScreen() {
                         colors={TOKENS.GRADIENTS.PRIMARY}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        style={[styles.button, isLoading && styles.buttonDisabled]}
+                        style={[styles.button, isLoading ? styles.buttonDisabled : null]}
                       >
                         {isLoading ? (
                           <ActivityIndicator color="#ffffff" size="small" />
@@ -197,9 +216,16 @@ export default function LoginScreen() {
 
               {/* Bottom Terms */}
               <Animated.View entering={FadeInUp.duration(500).delay(800)}>
-                <RNText style={styles.termsText}>
-                  By continuing, you agree to our <RNText style={styles.linkText}>Terms</RNText> & <RNText style={styles.linkText}>Privacy Policy</RNText>
-                </RNText>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <RNText style={[styles.termsText, { color: 'rgba(255,255,255,0.8)' }]}>By continuing, you agree to our </RNText>
+                  <TouchableOpacity onPress={() => router.push('/terms')} activeOpacity={0.6}>
+                    <RNText style={[styles.termsText, styles.linkText, { color: '#ffffff' }]}>Terms</RNText>
+                  </TouchableOpacity>
+                  <RNText style={[styles.termsText, { color: 'rgba(255,255,255,0.8)' }]}> & </RNText>
+                  <TouchableOpacity onPress={() => router.push('/privacy')} activeOpacity={0.6}>
+                    <RNText style={[styles.termsText, styles.linkText, { color: '#ffffff' }]}>Privacy Policy</RNText>
+                  </TouchableOpacity>
+                </View>
               </Animated.View>
               
             </View>
@@ -237,8 +263,7 @@ export default function LoginScreen() {
           </View>
         </View>
       </Modal>
-
-    </View>
+    </GradientBackground>
   );
 }
 
@@ -254,24 +279,16 @@ const styles = StyleSheet.create({
   blob1: {
     width: 350,
     height: 350,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     top: -100,
     right: -100,
-    shadowColor: '#fff',
-    shadowOpacity: 1,
-    shadowRadius: 100,
-    elevation: 20,
   },
   blob2: {
     width: 400,
     height: 400,
-    backgroundColor: 'rgba(0, 255, 255, 0.08)',
+    backgroundColor: 'rgba(0, 255, 255, 0.12)',
     bottom: -150,
     left: -150,
-    shadowColor: '#0ff',
-    shadowOpacity: 1,
-    shadowRadius: 100,
-    elevation: 20,
   },
   scrollContent: {
     flexGrow: 1, 
@@ -293,23 +310,22 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.3,
     shadowRadius: 24,
-    elevation: 15,
     marginBottom: 24,
+    borderRadius: 70,
   },
   logoContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(0,0,0,0)',
   },
   logo: {
-    width: 125,
-    height: 125,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   badge: {
     flexDirection: 'row',
@@ -414,7 +430,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: Platform.OS === 'web' ? 8 : 0,
   },
   button: {
     height: 56,

@@ -54,8 +54,7 @@ export default function SetPasswordScreen() {
   const buttonAnimatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: buttonScale.value }] }));
 
   return (
-    <GradientBackground>
-      <View style={styles.container}>
+    <GradientBackground style={styles.container}>
       
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -64,7 +63,7 @@ export default function SetPasswordScreen() {
             <View style={styles.contentMaxWidth}>
               
               <View style={styles.headerContainer}>
-                <View style={[styles.iconCircle, { backgroundColor: isDark ? 'rgba(30,41,59,0.8)' : '#ffffff', elevation: 2, shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.1, shadowRadius: 12 }]}>
+                <View style={[styles.iconCircle, { backgroundColor: isDark ? 'rgba(30,41,59,0.8)' : '#ffffff', elevation: Platform.OS === 'web' ? 2 : 0, shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.1, shadowRadius: 12 }]}>
                   <KeyRound size={40} color="#005eb8" strokeWidth={1.5} />
                 </View>
                 <RNText style={[styles.title, { color: isDark ? '#ffffff' : '#0f172a' }]}>Set a Password</RNText>
@@ -134,7 +133,6 @@ export default function SetPasswordScreen() {
           </YStack>
         </ScrollView>
       </KeyboardAvoidingView>
-      </View>
     </GradientBackground>
   );
 }
@@ -147,13 +145,13 @@ const styles = StyleSheet.create({
   iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 32, fontWeight: '800', color: '#ffffff', marginBottom: 12, textAlign: 'center' },
   subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)', textAlign: 'center', lineHeight: 24, paddingHorizontal: 20 },
-  formCard: { backgroundColor: '#ffffff', borderRadius: 32, overflow: "hidden", padding: 28, paddingTop: 36, ...TOKENS.SHADOWS.ELEVATED, marginBottom: 32, overflow: 'hidden' },
+  formCard: { backgroundColor: '#ffffff', borderRadius: 32, padding: 28, paddingTop: 36, ...TOKENS.SHADOWS.ELEVATED, marginBottom: 32, overflow: 'hidden' },
   cardAccent: { position: 'absolute', top: 0, left: '25%', width: '50%', height: 4, backgroundColor: '#005eb8', borderBottomLeftRadius: 4, borderBottomRightRadius: 4 },
   inputSection: { marginBottom: 24 },
   label: { fontWeight: '600', color: '#334155', fontSize: 14 },
   inputContainer: { flexDirection: 'row', alignItems: 'center', height: 56, borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: TOKENS.RADIUS.MD, backgroundColor: '#f8fafc', overflow: 'hidden' },
   inputFocused: { borderColor: '#005eb8', backgroundColor: '#ffffff' },
-  iconWrap: { width: 50, height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
+  iconWrap: { width: 50, height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0)' },
   input: { flex: 1, height: '100%', fontSize: 16, color: '#0f172a', fontWeight: '600', paddingRight: 16 },
   button: { height: 56, borderRadius: TOKENS.RADIUS.MD, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   buttonText: { color: '#ffffff', fontWeight: '700', fontSize: 16, letterSpacing: 0.3 }
