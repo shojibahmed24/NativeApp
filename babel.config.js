@@ -21,5 +21,10 @@ module.exports = function(api) {
         },
       ],
     ],
-  , env: { production: { plugins: ['babel-plugin-transform-remove-console'] } } };
+    env: {
+      production: {
+        plugins: ['babel-plugin-transform-remove-console']
+      }
+    }
+  };
 };
