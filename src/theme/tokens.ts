@@ -16,8 +16,13 @@ export const TOKENS = {
   COLORS: {
     BRAND: '#005eb8',
     TEXT_PRIMARY: '#0f172a',
+    TEXT_PRIMARY_DARK: '#f8fafc',
     TEXT_SECONDARY: '#475569',
+    TEXT_SECONDARY_DARK: '#94a3b8',
     TEXT_MUTED: '#64748b',
+    TEXT_MUTED_DARK: '#64748b',
+    SURFACE: '#ffffff',
+    SURFACE_DARK: 'rgba(30,41,59,0.7)',
     SUCCESS: '#10b981',
     DANGER: '#ef4444',
     WARNING: '#f59e0b',
