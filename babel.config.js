@@ -4,15 +4,6 @@ module.exports = function(api) {
     presets: ['babel-preset-expo'],
     plugins: [
       [
-        'babel-plugin-transform-imports',
-        {
-          'lucide-react-native': {
-            transform: 'lucide-react-native/dist/cjs/icons/',
-            preventFullImport: true,
-          }
-        }
-      ],
-      [
         '@tamagui/babel-plugin',
         {
           components: ['tamagui'],
