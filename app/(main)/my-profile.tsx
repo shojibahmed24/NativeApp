@@ -151,6 +151,7 @@ const SettingRow = ({
 // ─── Section Card ─────────────────────────────────────────────────
 const SectionCard = ({ title, children, delay = 0 }: any) => {
   const { isDark } = useThemeContext();
+  const styles = getStyles(isDark);
   return (
   <Animated.View entering={SlideInRight.delay(delay).springify()} style={styles.sectionCard}>
     {title && (
