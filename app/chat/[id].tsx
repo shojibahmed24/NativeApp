@@ -48,6 +48,204 @@ const ScaleButton = ({ onPress, children, style, ...props }: any) => {
   );
 };
 
+
+const MessageBubble = React.memo(({ msg, isTranslated, translatedMessages, renderRightActions, setReplyingTo, setActivePaymentMsg, setPaymentModalVisible, toggleChecklistItem, toggleTranslation, id, isDark }: any) => {
+    const isTranslated = translatedMessages[msg.id];
+    return (
+      <Swipeable
+        renderRightActions={(p, d) => renderRightActions(p, d, msg)}
+        onSwipeableOpen={() => {
+          Platform.OS !== 'web' && Haptics.impactAsync();
+          setReplyingTo(msg);
+        }}
+      >
+        <Animated.View 
+          entering={FadeInDown.duration(300)} 
+          
+          style={{
+            alignSelf: msg.isSender ? 'flex-end' : 'flex-start',
+            marginBottom: 16,
+            maxWidth: '85%',
+          }}
+        >
+          {msg.emoji ? (
+            <AnimatedEmoji emoji={msg.text || '❤️'} size={50} />
+          ) : (
+            <View style={{
+              shadowColor: msg.isSender ? '#4f46e5' : (isDark ? '#000' : '#0f172a'),
+              shadowOpacity: msg.isSender ? 0.3 : 0.08,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: Platform.OS === 'web' ? (msg.isSender ? 2 : 1) : 0,
+              borderRadius: TOKENS.RADIUS.LG,
+              borderBottomRightRadius: msg.isSender ? 4 : 24,
+              borderBottomLeftRadius: msg.isSender ? 24 : 4,
+              backgroundColor: msg.isSender ? '#6366f1' : (isDark ? '#1e293b' : '#f8fafc'),
+            }}>
+              <View style={{
+                backgroundColor: msg.isSender ? '#6366f1' : (isDark ? '#1e293b' : '#f8fafc'),
+                padding: 12,
+                paddingHorizontal: 16,
+                borderRadius: TOKENS.RADIUS.LG,
+                borderBottomRightRadius: msg.isSender ? 4 : 24,
+                borderBottomLeftRadius: msg.isSender ? 24 : 4,
+                overflow: 'hidden'
+              }}>
+                {msg.isSender && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:1, y:1}} end={{x:0, y:0}} style={StyleSheet.absoluteFill} />}
+                
+                {msg.replyToId && (
+                  <View style={{ backgroundColor: msg.isSender ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.08)', padding: 10, borderRadius: TOKENS.RADIUS.MD, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: msg.isSender ? '#fff' : '#6366f1' }}>
+                    <Text color={msg.isSender ? 'rgba(255,255,255,0.8)' : '#6366f1'} fontSize="$2" fontWeight="800" marginBottom={2}>Replying to message</Text>
+                    <Text color={msg.isSender ? '#fff' : '#334155'} fontSize="$3" numberOfLines={1}>Tap to view previous context...</Text>
+                  </View>
+                )}
+
+                {msg.type === 'image' && msg.mediaUrl && (
+                  <View style={{ marginBottom: 10, borderRadius: TOKENS.RADIUS.MD, ...TOKENS.SHADOWS.ELEVATED }}>
+                    <Image contentFit="cover" cachePolicy="memory-disk" transition={200} source={{ uri: msg.mediaUrl }} style={{ width: 260, height: undefined, aspectRatio: 4/3, borderRadius: TOKENS.RADIUS.MD }} />
+                  </View>
+                )}
+                {msg.type === 'audio' && msg.mediaUrl && (
+                  <View style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: msg.isSender ? 'rgba(255,255,255,0.2)' : '#eef2ff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: TOKENS.RADIUS.XL }}>
+                    <TouchableOpacity 
+                      onPress={async () => {
+                        try {
+                          const player = createAudioPlayer(msg.mediaUrl);
+                          player.play();
+                          player.addListener('playbackStatusUpdate', (status) => {
+                            if (status.didJustFinish) { player.release(); }
+                          });
+                        } catch (e) { console.log('Audio play error:', e); }
+                      }}
+                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: msg.isSender ? '#fff' : '#6366f1', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                      <Play color={msg.isSender ? '#6366f1' : '#fff'} size={18} />
+                    </TouchableOpacity>
+                    <XStack space="$1" alignItems="center">
+                      {[12, 18, 10, 24, 14, 20, 16, 10, 18].map((h, i) => (
+                        <View key={i} style={{ width: 3, height: h, backgroundColor: msg.isSender ? 'rgba(255,255,255,0.8)' : '#6366f1', borderRadius: 2 }} />
+                      ))}
+                    </XStack>
+                    <Text color={msg.isSender ? '#fff' : '#6366f1'} marginLeft={12} fontSize={12} fontWeight="700">{msg.metadata?.duration ? `${Math.floor(msg.metadata.duration / 60)}:${String(msg.metadata.duration % 60).padStart(2, '0')}` : '0:00'}</Text>
+                  </View>
+                )}
+                {msg.type === 'document' && msg.mediaUrl && (
+                  <View style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: msg.isSender ? 'rgba(255,255,255,0.2)' : 'rgba(59,130,246,0.1)', padding: 12, borderRadius: TOKENS.RADIUS.MD }}>
+                    <View style={{ padding: 10, borderRadius: TOKENS.RADIUS.MD, backgroundColor: msg.isSender ? '#fff' : '#3b82f6', marginRight: 12 }}>
+                      <FileText color={msg.isSender ? '#3b82f6' : '#fff'} size={20} />
+                    </View>
+                    <YStack flex={1}>
+                      <Text color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#0f172a')} numberOfLines={1} fontWeight="bold">{msg.fileName || 'Document'}</Text>
+                      <Text color={msg.isSender ? 'rgba(255,255,255,0.8)' : '#64748b'} fontSize={12} marginTop={2}>FILE ATTACHMENT</Text>
+                    </YStack>
+                  </View>
+                )}
+                {msg.type === 'money_request' && msg.metadata && (
+                  <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 220, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
+                    <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <View style={{ padding: 14, borderRadius: TOKENS.RADIUS.XL, marginBottom: 12, overflow: 'hidden' }}>
+                        <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
+                        <Banknote color="#fff" size={28} />
+                      </View>
+                      <Text color={TOKENS.COLORS.SUCCESS} fontSize="$3" fontWeight="700">Payment Request</Text>
+                      <Text color="#064e3b" fontWeight="900" fontSize="$8" marginVertical="$2">{msg.metadata.currency}{msg.metadata.amount}</Text>
+                      
+                      {msg.metadata?.status === 'paid' ? (
+                         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10b981', paddingVertical: 12, paddingHorizontal: 24, borderRadius: TOKENS.RADIUS.LG, width: '100%', justifyContent: 'center' }}>
+                           <Check color="#fff" size={20} strokeWidth={3} style={{ marginRight: 8 }} />
+                           <Text color="white" fontWeight="bold">Paid</Text>
+                         </View>
+                      ) : (
+                         <ScaleButton onPress={() => { setActivePaymentMsg(msg); setPaymentModalVisible(true); Platform.OS !== 'web' && Haptics.impactAsync(); }} style={{ width: '100%', overflow: 'hidden', borderRadius: TOKENS.RADIUS.LG }}>
+                           <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
+                           <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                             <Text color="white" fontWeight="bold" fontSize={16}>Pay Now</Text>
+                           </View>
+                         </ScaleButton>
+                      )}
+                    </View>
+                  </View>
+                )}
+                  {(msg.type === 'todo_list' || msg.mediaType === 'todo_list') && msg.metadata?.tasks && (
+                    <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 260, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
+                      <View style={{ padding: 16 }}>
+                        <XStack alignItems="center" marginBottom="$4">
+                           <View style={{ width: 40, height: 40, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />
+                             <CheckSquare color="#fff" size={20} />
+                           </View>
+                           <YStack flex={1}>
+                             <Text color={TOKENS.COLORS.TEXT_PRIMARY} fontWeight="800" fontSize={16}>{msg.metadata.title || 'Task List'}</Text>
+                             <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize={12} fontWeight="600">{msg.metadata.tasks.filter((t: any) => t.done).length} of {msg.metadata.tasks.length} completed</Text>
+                           </YStack>
+                        </XStack>
+                        
+                        <View style={{ height: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#f1f5f9', borderRadius: 4, marginBottom: 16, overflow: 'hidden' }}>
+                          <View style={{ height: '100%', width: `${(msg.metadata.tasks.filter((t: any) => t.done).length / (msg.metadata.tasks.length||1)) * 100}%`, borderRadius: 4 }}>
+                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFill} />
+                          </View>
+                        </View>
+                    
+                        <YStack space="$3">
+                          {msg.metadata.tasks.map((task: any) => (
+                            <ScaleButton key={task.id} onPress={() => toggleTask(msg.id, task.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4 }}>
+                               <View style={{ width: 24, height: 24, borderRadius: TOKENS.RADIUS.SM, borderWidth: 2, borderColor: task.done ? '#6366f1' : '#cbd5e1', backgroundColor: task.done ? '#6366f1' : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                  {task.done && <Check color="#fff" size={14} strokeWidth={3.5} />}
+                               </View>
+                               <Text color={task.done ? '#94a3b8' : (isDark ? '#f8fafc' : '#0f172a')} fontWeight={task.done ? "500" : "600"} style={{ textDecorationLine: task.done ? 'line-through' : 'none', flex: 1 }}>{task.title}</Text>
+                                 {task.price > 0 && (
+                                    <Text color={TOKENS.COLORS.SUCCESS} fontWeight="800" fontSize={13} style={{ marginLeft: 8 }}>${task.price}</Text>
+                                 )}
+                            </ScaleButton>
+                          ))}
+                        </YStack>
+                      </View>
+                    </View>
+                  )}
+                {msg.type === 'checklist' && msg.metadata && (
+                  <View style={{ backgroundColor: msg.isSender ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.08)', padding: 14, borderRadius: TOKENS.RADIUS.MD, marginBottom: 10, minWidth: 200 }}>
+                    <Text fontWeight="800" marginBottom="$3" color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#0f172a')}>{msg.text}</Text>
+                    {msg.metadata.items.map((item: any) => (
+                      <ScaleButton key={item.id} onPress={() => { toggleChecklistItem(id as string, msg.id, item.id); }} style={{ paddingVertical: 4 }}>
+                        <XStack space="$3" alignItems="center" marginBottom="$2">
+                          <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: item.done ? (msg.isSender ? '#fff' : '#6366f1') : (msg.isSender ? 'rgba(255,255,255,0.5)' : '#cbd5e1'), backgroundColor: item.done ? (msg.isSender ? '#fff' : '#6366f1') : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                            {item.done && <Check color={msg.isSender ? '#6366f1' : '#fff'} size={12} strokeWidth={4} />}
+                          </View>
+                          <Text color={msg.isSender ? (item.done ? 'rgba(255,255,255,0.6)' : '#fff') : (item.done ? '#94a3b8' : '#334155')} fontWeight={item.done ? "500" : "600"} textDecorationLine={item.done ? 'line-through' : 'none'}>{item.text}</Text>
+                        </XStack>
+                      </ScaleButton>
+                    ))}
+                  </View>
+                )}
+                {msg.type === 'text' && msg.text && !msg.emoji ? (
+                  <Text color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#1e293b')} fontSize="$4" fontWeight="500" lineHeight={22}>
+                    {isTranslated ? "*(Translated)* " + (msg.metadata?.translatedText || "Translation unavailable") : msg.text}
+                  </Text>
+                ) : null}
+                <XStack justifyContent="flex-end" alignItems="center" marginTop="$2" space="$2">
+                  {msg.status === 'scheduled' && <Clock size={12} color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#999'} />}
+                  {!msg.isSender && msg.type === 'text' && (
+                    <ScaleButton onPress={() => toggleTranslation(msg.id)} style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#eef2ff', justifyContent: 'center', alignItems: 'center' }}>
+                      <Languages size={14} color="#6366f1" />
+                    </ScaleButton>
+                  )}
+                  <Text color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#94a3b8'} fontSize="$2" fontWeight="600">
+                    {msg.time}
+                  </Text>
+                  {msg.isSender && (
+                    msg.status === 'read' ? <CheckCheck size={16} color="#38bdf8" /> : 
+                    msg.status === 'delivered' ? <CheckCheck size={16} color="rgba(255,255,255,0.6)" /> :
+                    <Check size={16} color="rgba(255,255,255,0.6)" />
+                  )}
+                </XStack>
+              </View>
+            </View>
+          )}
+        </Animated.View>
+      </Swipeable>
+    );
+  });
+
 export default function ChatThreadScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -313,202 +511,25 @@ export default function ChatThreadScreen() {
     );
   };
 
-  const renderItem = ({ item: msg }: { item: any }) => {
-    const isTranslated = translatedMessages[msg.id];
+  
+  const renderItem = React.useCallback(({ item: msg }: { item: any }) => {
     return (
-      <Swipeable
-        renderRightActions={(p, d) => renderRightActions(p, d, msg)}
-        onSwipeableOpen={() => {
-          Platform.OS !== 'web' && Haptics.impactAsync();
-          setReplyingTo(msg);
-        }}
-      >
-        <Animated.View 
-          entering={FadeInDown.duration(300)} 
-          
-          style={{
-            alignSelf: msg.isSender ? 'flex-end' : 'flex-start',
-            marginBottom: 16,
-            maxWidth: '85%',
-          }}
-        >
-          {msg.emoji ? (
-            <AnimatedEmoji emoji={msg.text || '❤️'} size={50} />
-          ) : (
-            <View style={{
-              shadowColor: msg.isSender ? '#4f46e5' : (isDark ? '#000' : '#0f172a'),
-              shadowOpacity: msg.isSender ? 0.3 : 0.08,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 4 },
-              elevation: Platform.OS === 'web' ? (msg.isSender ? 2 : 1) : 0,
-              borderRadius: TOKENS.RADIUS.LG,
-              borderBottomRightRadius: msg.isSender ? 4 : 24,
-              borderBottomLeftRadius: msg.isSender ? 24 : 4,
-              backgroundColor: msg.isSender ? '#6366f1' : (isDark ? '#1e293b' : '#f8fafc'),
-            }}>
-              <View style={{
-                backgroundColor: msg.isSender ? '#6366f1' : (isDark ? '#1e293b' : '#f8fafc'),
-                padding: 12,
-                paddingHorizontal: 16,
-                borderRadius: TOKENS.RADIUS.LG,
-                borderBottomRightRadius: msg.isSender ? 4 : 24,
-                borderBottomLeftRadius: msg.isSender ? 24 : 4,
-                overflow: 'hidden'
-              }}>
-                {msg.isSender && <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:1, y:1}} end={{x:0, y:0}} style={StyleSheet.absoluteFill} />}
-                
-                {msg.replyToId && (
-                  <View style={{ backgroundColor: msg.isSender ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.08)', padding: 10, borderRadius: TOKENS.RADIUS.MD, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: msg.isSender ? '#fff' : '#6366f1' }}>
-                    <Text color={msg.isSender ? 'rgba(255,255,255,0.8)' : '#6366f1'} fontSize="$2" fontWeight="800" marginBottom={2}>Replying to message</Text>
-                    <Text color={msg.isSender ? '#fff' : '#334155'} fontSize="$3" numberOfLines={1}>Tap to view previous context...</Text>
-                  </View>
-                )}
-
-                {msg.type === 'image' && msg.mediaUrl && (
-                  <View style={{ marginBottom: 10, borderRadius: TOKENS.RADIUS.MD, ...TOKENS.SHADOWS.ELEVATED }}>
-                    <Image contentFit="cover" cachePolicy="memory-disk" transition={200} source={{ uri: msg.mediaUrl }} style={{ width: 260, height: undefined, aspectRatio: 4/3, borderRadius: TOKENS.RADIUS.MD }} />
-                  </View>
-                )}
-                {msg.type === 'audio' && msg.mediaUrl && (
-                  <View style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: msg.isSender ? 'rgba(255,255,255,0.2)' : '#eef2ff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: TOKENS.RADIUS.XL }}>
-                    <TouchableOpacity 
-                      onPress={async () => {
-                        try {
-                          const player = createAudioPlayer(msg.mediaUrl);
-                          player.play();
-                          player.addListener('playbackStatusUpdate', (status) => {
-                            if (status.didJustFinish) { player.release(); }
-                          });
-                        } catch (e) { console.log('Audio play error:', e); }
-                      }}
-                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: msg.isSender ? '#fff' : '#6366f1', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
-                      <Play color={msg.isSender ? '#6366f1' : '#fff'} size={18} />
-                    </TouchableOpacity>
-                    <XStack space="$1" alignItems="center">
-                      {[12, 18, 10, 24, 14, 20, 16, 10, 18].map((h, i) => (
-                        <View key={i} style={{ width: 3, height: h, backgroundColor: msg.isSender ? 'rgba(255,255,255,0.8)' : '#6366f1', borderRadius: 2 }} />
-                      ))}
-                    </XStack>
-                    <Text color={msg.isSender ? '#fff' : '#6366f1'} marginLeft={12} fontSize={12} fontWeight="700">{msg.metadata?.duration ? `${Math.floor(msg.metadata.duration / 60)}:${String(msg.metadata.duration % 60).padStart(2, '0')}` : '0:00'}</Text>
-                  </View>
-                )}
-                {msg.type === 'document' && msg.mediaUrl && (
-                  <View style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: msg.isSender ? 'rgba(255,255,255,0.2)' : 'rgba(59,130,246,0.1)', padding: 12, borderRadius: TOKENS.RADIUS.MD }}>
-                    <View style={{ padding: 10, borderRadius: TOKENS.RADIUS.MD, backgroundColor: msg.isSender ? '#fff' : '#3b82f6', marginRight: 12 }}>
-                      <FileText color={msg.isSender ? '#3b82f6' : '#fff'} size={20} />
-                    </View>
-                    <YStack flex={1}>
-                      <Text color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#0f172a')} numberOfLines={1} fontWeight="bold">{msg.fileName || 'Document'}</Text>
-                      <Text color={msg.isSender ? 'rgba(255,255,255,0.8)' : '#64748b'} fontSize={12} marginTop={2}>FILE ATTACHMENT</Text>
-                    </YStack>
-                  </View>
-                )}
-                {msg.type === 'money_request' && msg.metadata && (
-                  <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 220, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
-                    <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFill} />
-                    <View style={{ padding: 20, alignItems: 'center' }}>
-                      <View style={{ padding: 14, borderRadius: TOKENS.RADIUS.XL, marginBottom: 12, overflow: 'hidden' }}>
-                        <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
-                        <Banknote color="#fff" size={28} />
-                      </View>
-                      <Text color={TOKENS.COLORS.SUCCESS} fontSize="$3" fontWeight="700">Payment Request</Text>
-                      <Text color="#064e3b" fontWeight="900" fontSize="$8" marginVertical="$2">{msg.metadata.currency}{msg.metadata.amount}</Text>
-                      
-                      {msg.metadata?.status === 'paid' ? (
-                         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10b981', paddingVertical: 12, paddingHorizontal: 24, borderRadius: TOKENS.RADIUS.LG, width: '100%', justifyContent: 'center' }}>
-                           <Check color="#fff" size={20} strokeWidth={3} style={{ marginRight: 8 }} />
-                           <Text color="white" fontWeight="bold">Paid</Text>
-                         </View>
-                      ) : (
-                         <ScaleButton onPress={() => { setActivePaymentMsg(msg); setPaymentModalVisible(true); Platform.OS !== 'web' && Haptics.impactAsync(); }} style={{ width: '100%', overflow: 'hidden', borderRadius: TOKENS.RADIUS.LG }}>
-                           <LinearGradient colors={TOKENS.GRADIENTS.SUCCESS} style={StyleSheet.absoluteFill} />
-                           <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-                             <Text color="white" fontWeight="bold" fontSize={16}>Pay Now</Text>
-                           </View>
-                         </ScaleButton>
-                      )}
-                    </View>
-                  </View>
-                )}
-                  {(msg.type === 'todo_list' || msg.mediaType === 'todo_list') && msg.metadata?.tasks && (
-                    <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff', borderRadius: TOKENS.RADIUS.LG, minWidth: 260, marginBottom: 10, ...TOKENS.SHADOWS.ELEVATED, overflow: 'hidden' }}>
-                      <View style={{ padding: 16 }}>
-                        <XStack alignItems="center" marginBottom="$4">
-                           <View style={{ width: 40, height: 40, borderRadius: TOKENS.RADIUS.LG, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} style={StyleSheet.absoluteFill} />
-                             <CheckSquare color="#fff" size={20} />
-                           </View>
-                           <YStack flex={1}>
-                             <Text color={TOKENS.COLORS.TEXT_PRIMARY} fontWeight="800" fontSize={16}>{msg.metadata.title || 'Task List'}</Text>
-                             <Text color={TOKENS.COLORS.TEXT_SECONDARY} fontSize={12} fontWeight="600">{msg.metadata.tasks.filter((t: any) => t.done).length} of {msg.metadata.tasks.length} completed</Text>
-                           </YStack>
-                        </XStack>
-                        
-                        <View style={{ height: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#f1f5f9', borderRadius: 4, marginBottom: 16, overflow: 'hidden' }}>
-                          <View style={{ height: '100%', width: `${(msg.metadata.tasks.filter((t: any) => t.done).length / (msg.metadata.tasks.length||1)) * 100}%`, borderRadius: 4 }}>
-                             <LinearGradient colors={TOKENS.GRADIENTS.PRIMARY} start={{x:0, y:0}} end={{x:1, y:0}} style={StyleSheet.absoluteFill} />
-                          </View>
-                        </View>
-                    
-                        <YStack space="$3">
-                          {msg.metadata.tasks.map((task: any) => (
-                            <ScaleButton key={task.id} onPress={() => toggleTask(msg.id, task.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4 }}>
-                               <View style={{ width: 24, height: 24, borderRadius: TOKENS.RADIUS.SM, borderWidth: 2, borderColor: task.done ? '#6366f1' : '#cbd5e1', backgroundColor: task.done ? '#6366f1' : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                  {task.done && <Check color="#fff" size={14} strokeWidth={3.5} />}
-                               </View>
-                               <Text color={task.done ? '#94a3b8' : (isDark ? '#f8fafc' : '#0f172a')} fontWeight={task.done ? "500" : "600"} style={{ textDecorationLine: task.done ? 'line-through' : 'none', flex: 1 }}>{task.title}</Text>
-                                 {task.price > 0 && (
-                                    <Text color={TOKENS.COLORS.SUCCESS} fontWeight="800" fontSize={13} style={{ marginLeft: 8 }}>${task.price}</Text>
-                                 )}
-                            </ScaleButton>
-                          ))}
-                        </YStack>
-                      </View>
-                    </View>
-                  )}
-                {msg.type === 'checklist' && msg.metadata && (
-                  <View style={{ backgroundColor: msg.isSender ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.08)', padding: 14, borderRadius: TOKENS.RADIUS.MD, marginBottom: 10, minWidth: 200 }}>
-                    <Text fontWeight="800" marginBottom="$3" color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#0f172a')}>{msg.text}</Text>
-                    {msg.metadata.items.map((item: any) => (
-                      <ScaleButton key={item.id} onPress={() => { toggleChecklistItem(id as string, msg.id, item.id); }} style={{ paddingVertical: 4 }}>
-                        <XStack space="$3" alignItems="center" marginBottom="$2">
-                          <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: item.done ? (msg.isSender ? '#fff' : '#6366f1') : (msg.isSender ? 'rgba(255,255,255,0.5)' : '#cbd5e1'), backgroundColor: item.done ? (msg.isSender ? '#fff' : '#6366f1') : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                            {item.done && <Check color={msg.isSender ? '#6366f1' : '#fff'} size={12} strokeWidth={4} />}
-                          </View>
-                          <Text color={msg.isSender ? (item.done ? 'rgba(255,255,255,0.6)' : '#fff') : (item.done ? '#94a3b8' : '#334155')} fontWeight={item.done ? "500" : "600"} textDecorationLine={item.done ? 'line-through' : 'none'}>{item.text}</Text>
-                        </XStack>
-                      </ScaleButton>
-                    ))}
-                  </View>
-                )}
-                {msg.type === 'text' && msg.text && !msg.emoji ? (
-                  <Text color={msg.isSender ? '#fff' : (isDark ? '#f8fafc' : '#1e293b')} fontSize="$4" fontWeight="500" lineHeight={22}>
-                    {isTranslated ? "*(Translated)* " + (msg.metadata?.translatedText || "Translation unavailable") : msg.text}
-                  </Text>
-                ) : null}
-                <XStack justifyContent="flex-end" alignItems="center" marginTop="$2" space="$2">
-                  {msg.status === 'scheduled' && <Clock size={12} color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#999'} />}
-                  {!msg.isSender && msg.type === 'text' && (
-                    <ScaleButton onPress={() => toggleTranslation(msg.id)} style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#eef2ff', justifyContent: 'center', alignItems: 'center' }}>
-                      <Languages size={14} color="#6366f1" />
-                    </ScaleButton>
-                  )}
-                  <Text color={msg.isSender ? 'rgba(255,255,255,0.7)' : '#94a3b8'} fontSize="$2" fontWeight="600">
-                    {msg.time}
-                  </Text>
-                  {msg.isSender && (
-                    msg.status === 'read' ? <CheckCheck size={16} color="#38bdf8" /> : 
-                    msg.status === 'delivered' ? <CheckCheck size={16} color="rgba(255,255,255,0.6)" /> :
-                    <Check size={16} color="rgba(255,255,255,0.6)" />
-                  )}
-                </XStack>
-              </View>
-            </View>
-          )}
-        </Animated.View>
-      </Swipeable>
+      <MessageBubble
+        msg={msg}
+        isTranslated={translatedMessages[msg.id]}
+        translatedMessages={translatedMessages}
+        renderRightActions={renderRightActions}
+        setReplyingTo={setReplyingTo}
+        setActivePaymentMsg={setActivePaymentMsg}
+        setPaymentModalVisible={setPaymentModalVisible}
+        toggleChecklistItem={toggleChecklistItem}
+        toggleTranslation={toggleTranslation}
+        id={id}
+        isDark={isDark}
+      />
     );
-  };
+  }, [translatedMessages, renderRightActions, id, setReplyingTo, setActivePaymentMsg, setPaymentModalVisible, toggleChecklistItem, toggleTranslation, isDark]);
+
   const renderBackground = (children: React.ReactNode) => {
     return (
       <GradientBackground style={{ flex: 1 }}>
@@ -769,7 +790,7 @@ export default function ChatThreadScreen() {
               <ScaleButton onPress={() => { pickImage(); setShowScheduleOptions(false); Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={{ alignItems: 'center' }}>
                 <Animated.View entering={FadeInDown.delay(80).springify()} style={{ padding: 16, borderRadius: TOKENS.RADIUS.LG, marginBottom: 8, overflow: 'hidden', ...TOKENS.SHADOWS.COLORED(TOKENS.COLORS.WARNING) }}>
                   <LinearGradient colors={TOKENS.GRADIENTS.GOLD} style={StyleSheet.absoluteFill} />
-                  <ImageIcon color="#fff" size={26} />
+                  <ImageIcon color="#fff" size={26}  contentFit="cover" cachePolicy="memory-disk" transition={200} />
                 </Animated.View>
                 <Text fontSize={13} color={TOKENS.COLORS.TEXT_SECONDARY} fontWeight="600">Gallery</Text>
               </ScaleButton>

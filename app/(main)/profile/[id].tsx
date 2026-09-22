@@ -1,10 +1,8 @@
+import { Image } from 'expo-image';
 // @ts-nocheck
 ﻿import { useThemeContext } from '../../../src/context/ThemeContext';
 import React, { useState, useEffect } from 'react';
-import {
-  ScrollView, TouchableOpacity, View, Image, ActivityIndicator,
-  StyleSheet, Platform, Alert, ImageBackground, Modal, Dimensions, StatusBar
-} from 'react-native';
+import { ScrollView, TouchableOpacity, View, ActivityIndicator, StyleSheet, Platform, Alert, ImageBackground, Modal, Dimensions, StatusBar } from 'react-native';
 import { YStack, XStack, Text } from 'tamagui';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -125,7 +123,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
         <View>
           {profile?.chatWallpaper ? (
-            <ImageBackground source={{ uri: profile.chatWallpaper }} style={styles.cover}>
+            <ImageBackground source={{ uri: profile.chatWallpaper }} style={styles.cover} contentFit="cover" cachePolicy="memory-disk" transition={200}>
               <LinearGradient colors={['rgba(15,23,42,0.7)', 'rgba(15,23,42,0.2)', isDark ? '#0f172a' : '#f8fafc']} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
             </ImageBackground>
           ) : (
@@ -145,7 +143,7 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={() => setShowPhotoViewer(true)} activeOpacity={0.85}>
               <View style={styles.avatarRing}>
                 <LinearGradient colors={isDark ? ['#0f172a', '#1e293b'] : ['#f0f4ff', '#ede9fe']} start={{x:0,y:0}} end={{x:1,y:1}} style={[StyleSheet.absoluteFill, { borderRadius: (AVATAR_SIZE+10)/2 }]} />
-                {profile?.avatar ? <Image source={{ uri: profile.avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: avatarBg, justifyContent: 'center', alignItems: 'center' }]}><Text color="#fff" fontSize={44} fontWeight="900">{initial}</Text></View>}
+                {profile?.avatar ? <Image source={{ uri: profile.avatar }} style={styles.avatar}  contentFit="cover" cachePolicy="memory-disk" transition={200} /> : <View style={[styles.avatar, { backgroundColor: avatarBg, justifyContent: 'center', alignItems: 'center' }]}><Text color="#fff" fontSize={44} fontWeight="900">{initial}</Text></View>}
               </View>
             </TouchableOpacity>
           </Animated.View>
@@ -176,7 +174,7 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={() => router.push('/shared-media/' + id)} activeOpacity={0.8} style={styles.statsCardShadow}>
               <View style={[styles.statsCard, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 }]}>
                 <LinearGradient colors={isDark ? ['#1e293b', '#0f172a'] : ['#ffffff', '#f0f4ff']} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFill} />
-                <XStack alignItems="center" space="$3"><View style={[styles.iconBadgeEmerald, { backgroundColor: '#e0f2fe' }]}><ImageIcon color="#0284c7" size={20} /></View><YStack><Text fontWeight="800" fontSize={16} color={isDark ? '#f8fafc' : TOKENS.COLORS.TEXT_PRIMARY}>Media, Links, and Docs</Text><Text fontSize={13} color={isDark ? '#94a3b8' : TOKENS.COLORS.TEXT_SECONDARY} marginTop={2}>View all shared files</Text></YStack></XStack>
+                <XStack alignItems="center" space="$3"><View style={[styles.iconBadgeEmerald, { backgroundColor: '#e0f2fe' }]}><ImageIcon color="#0284c7" size={20}  contentFit="cover" cachePolicy="memory-disk" transition={200} /></View><YStack><Text fontWeight="800" fontSize={16} color={isDark ? '#f8fafc' : TOKENS.COLORS.TEXT_PRIMARY}>Media, Links, and Docs</Text><Text fontSize={13} color={isDark ? '#94a3b8' : TOKENS.COLORS.TEXT_SECONDARY} marginTop={2}>View all shared files</Text></YStack></XStack>
                 <ChevronLeft color={isDark ? '#94a3b8' : TOKENS.COLORS.TEXT_SECONDARY} size={20} style={{ transform: [{ rotate: '180deg' }] }} />
               </View>
             </TouchableOpacity>

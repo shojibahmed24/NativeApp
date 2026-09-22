@@ -1,5 +1,6 @@
+import { Image } from 'expo-image';
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Image, Platform, Dimensions, Linking } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Platform, Dimensions, Linking } from 'react-native';
 import { Text, YStack, XStack } from 'tamagui';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -60,7 +61,7 @@ export default function SharedMediaScreen() {
 
   const renderMediaItem = ({ item }) => (
     <TouchableOpacity onPress={() => openUrl(item.mediaUrl)}>
-      <Image source={{ uri: item.mediaUrl }} style={[styles.mediaThumb, { width: THUMB_SIZE, height: THUMB_SIZE }]} />
+      <Image source={{ uri: item.mediaUrl }} style={[styles.mediaThumb, { width: THUMB_SIZE, height: THUMB_SIZE }]}  contentFit="cover" cachePolicy="memory-disk" transition={200} />
     </TouchableOpacity>
   );
 
@@ -106,7 +107,7 @@ export default function SharedMediaScreen() {
 
       {/* Tabs */}
       <XStack style={[styles.tabsContainer, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}>
-        {renderTab('media', 'Media', (c) => <ImageIcon color={c} size={16} style={{ marginRight: 6 }} />)}
+        {renderTab('media', 'Media', (c) => <ImageIcon color={c} size={16} style={{ marginRight: 6 }}  contentFit="cover" cachePolicy="memory-disk" transition={200} />)}
         {renderTab('docs', 'Docs', (c) => <FileText color={c} size={16} style={{ marginRight: 6 }} />)}
         {renderTab('links', 'Links', (c) => <LinkIcon color={c} size={16} style={{ marginRight: 6 }} />)}
       </XStack>
