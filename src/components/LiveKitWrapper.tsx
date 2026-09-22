@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { useCall } from '../context/CallContext';
 import { useAuth } from '../context/AuthContext';

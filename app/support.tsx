@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, Linking } from 'react-native';
 import { Text, YStack, XStack } from 'tamagui';

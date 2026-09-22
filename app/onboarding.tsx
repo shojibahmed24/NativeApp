@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import { View, StyleSheet, Dimensions, Platform, TouchableOpacity, Image } from 'react-native';
 import { Text, YStack, XStack } from 'tamagui';

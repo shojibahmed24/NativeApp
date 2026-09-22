@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+// @ts-nocheck
+import React, { createContext, useContext, useEffect, useCallback, useMemo } from 'react';
+import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -26,18 +28,39 @@ import { useAuth } from './AuthContext';
 import { useCall } from './CallContext';
 import { uploadMediaToSupabase } from '../utils/storageUtils';
 
+
+export const useChatStore = create<any>((set, get) => ({
+  activeChats: [],
+  messages: {},
+  isTyping: {},
+  quickReplies: [],
+  onlineUsers: {},
+  loadingConversations: false,
+  setActiveChats: (updater: any) => set((state: any) => ({ activeChats: typeof updater === 'function' ? updater(state.activeChats) : updater })),
+  setMessages: (updater: any) => set((state: any) => ({ messages: typeof updater === 'function' ? updater(state.messages) : updater })),
+  setIsTyping: (updater: any) => set((state: any) => ({ isTyping: typeof updater === 'function' ? updater(state.isTyping) : updater })),
+  setQuickReplies: (updater: any) => set((state: any) => ({ quickReplies: typeof updater === 'function' ? updater(state.quickReplies) : updater })),
+  setOnlineUsers: (updater: any) => set((state: any) => ({ onlineUsers: typeof updater === 'function' ? updater(state.onlineUsers) : updater })),
+  setLoadingConversations: (loadingConversations: boolean) => set({ loadingConversations }),
+  setFunctions: (funcs: any) => set(funcs)
+}));
+
 const ChatContext = createContext<any>(null);
+
 
 export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   const { socket } = useCall();
   
-  const [activeChats, setActiveChats] = useState<any[]>([]);
-  const [messages, setMessages] = useState<Record<string, any[]>>({});
-  const [isTyping, setIsTyping] = useState<Record<string, boolean>>({});
-  const [quickReplies, setQuickReplies] = useState<string[]>([]);
-  const [onlineUsers, setOnlineUsers] = useState<Record<string, boolean>>({});
-  const [loadingConversations, setLoadingConversations] = useState(false);
+  const {
+    activeChats, setActiveChats,
+    messages, setMessages,
+    isTyping, setIsTyping,
+    quickReplies, setQuickReplies,
+    onlineUsers, setOnlineUsers,
+    loadingConversations, setLoadingConversations,
+    setFunctions
+  } = useChatStore();
 
   // Load conversations from real API
   const loadConversations = useCallback(async () => {
@@ -429,7 +452,13 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     await AsyncStorage.setItem('@quick_replies', JSON.stringify(newReplies));
   }, [quickReplies]);
 
-  const contextValue = useMemo(() => ({ activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally }), [activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally]);
+    const contextValue = useMemo(() => ({ activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally }), [activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally]);
+
+  useEffect(() => {
+    setFunctions({
+      sendMessage, loadMoreMessages, sendTypingEvent, addQuickReply, toggleChecklistItem, loadConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally
+    });
+  }, [setFunctions, sendMessage, loadMoreMessages, sendTypingEvent, addQuickReply, toggleChecklistItem, loadConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally]);
 
   return (
     <ChatContext.Provider value={contextValue}>

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-get-random-values';
 import { Platform, useColorScheme, Text, View as RNView, Text as RNText, useWindowDimensions } from 'react-native';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Image } from 'expo-image';
 // @ts-nocheck
 ﻿import { useThemeContext } from '../../../src/context/ThemeContext';

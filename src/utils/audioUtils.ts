@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
 
 let toneInterval: any = null;

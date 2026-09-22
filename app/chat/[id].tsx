@@ -13,9 +13,9 @@ import AnimatedEmoji from '../../src/components/AnimatedEmoji';
 import ReactionPicker from '../../src/components/ReactionPicker';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInUp, FadeInDown, Layout, useSharedValue, useAnimatedStyle, withTiming, FadeOutDown } from 'react-native-reanimated';
-import { useChat } from '../../src/context/ChatContext';
+import { useChatStore, useChat } from '../../src/context/ChatContext';
 import { useAuth } from '../../src/context/AuthContext';
-import { useCall } from '../../src/context/CallContext';
+import { useCallStore, useCall } from '../../src/context/CallContext';
 import { supabase } from '../../src/services/supabase';
 import { AudioRecorder, requestRecordingPermissionsAsync, setAudioModeAsync, createAudioPlayer } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
@@ -250,8 +250,8 @@ const MessageBubble = React.memo(({ msg, isTranslated, translatedMessages, rende
 export default function ChatThreadScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally } = useChat();
-  const { startVoiceCall } = useCall();
+  const { messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally } = useChatStore();
+  const { startVoiceCall } = useCallStore();
   const { user } = useAuth();
   const { isDark } = useThemeContext();
   const chatMessages = messages[id as string] || [];
@@ -311,7 +311,7 @@ export default function ChatThreadScreen() {
   const [copiedCrypto, setCopiedCrypto] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
 
-  const { activeChats } = useChat();
+  const { activeChats } = useChatStore();
   
   useEffect(() => {
     let isSubscribed = true;

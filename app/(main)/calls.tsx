@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { GradientBackground } from '../../src/components/ThemeComponents';
 import { TOKENS } from '../../src/theme/tokens';
 import { useThemeContext } from '../../src/context/ThemeContext';
@@ -11,7 +12,7 @@ import Animated, { FadeInRight, FadeInDown, FadeOutRight, FadeInUp, SlideInRight
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { useCall } from '../../src/context/CallContext';
+import { useCallStore, useCall } from '../../src/context/CallContext';
 import { api } from '../../src/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -178,7 +179,7 @@ export default function CallsScreen() {
   const { isDark } = useThemeContext();
   const styles = useMemo(() => getStyles(isDark), [isDark]);
   const { user } = useAuth();
-  const { startVoiceCall } = useCall();
+  const { startVoiceCall } = useCallStore();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   

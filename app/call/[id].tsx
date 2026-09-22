@@ -7,7 +7,7 @@ import { useCameraPermissions, CameraView } from 'expo-camera';
 import { MicOff, Grid, Volume2, Plus, Video, MessageSquare, PhoneOff, Mic, VolumeX, ChevronDown, Activity, Lock, Globe, Sparkles, AudioWaveform } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LiveKitWrapper from '../../src/components/LiveKitWrapper';
-import { useCall } from '../../src/context/CallContext';
+import { useCallStore, useCall } from '../../src/context/CallContext';
 import LiveKitVideoView from '../../src/components/LiveKitVideoView';
 import { useAuth } from '../../src/context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';

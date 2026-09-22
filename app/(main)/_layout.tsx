@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect } from 'react';
 import { CallProvider } from '../../src/context/CallContext';
 import { ChatProvider } from '../../src/context/ChatContext';

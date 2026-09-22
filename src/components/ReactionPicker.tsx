@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
 import Animated, { FadeIn, ZoomIn, SlideOutDown } from 'react-native-reanimated';

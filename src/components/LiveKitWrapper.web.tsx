@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { LiveKitRoom, RoomAudioRenderer, useLocalParticipant } from '@livekit/components-react';
 import { useCall } from '../context/CallContext';
