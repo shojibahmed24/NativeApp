@@ -55,6 +55,7 @@ export default function CallInfoScreen() {
   
   const [peerLogs, setPeerLogs] = useState<any[]>([]);
   const [peerInfo, setPeerInfo] = useState<any>(null);
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     if (!id) return;
