@@ -165,4 +165,5 @@ function RootLayout() {
   )
 }
 
-export default Sentry.wrap(RootLayout);
+const hasSentry = process.env.EXPO_PUBLIC_SENTRY_DSN && process.env.EXPO_PUBLIC_SENTRY_DSN.startsWith('http');
+export default hasSentry ? Sentry.wrap(RootLayout) : RootLayout;
