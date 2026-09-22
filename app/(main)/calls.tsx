@@ -2,7 +2,8 @@ import { GradientBackground } from '../../src/components/ThemeComponents';
 import { TOKENS } from '../../src/theme/tokens';
 import { useThemeContext } from '../../src/context/ThemeContext';
 import React, {  useState, useEffect, useCallback , useMemo } from 'react';
-import {  View, TextInput, TouchableOpacity, Text as RNText, StyleSheet, RefreshControl, Dimensions, Alert, Platform, KeyboardAvoidingView, ScrollView, Modal, Pressable, Image, Animated as RNAnimated , FlatList } from 'react-native';
+import {  View, TextInput, TouchableOpacity, Text as RNText, StyleSheet, RefreshControl, Dimensions, Alert, Platform, KeyboardAvoidingView, ScrollView, Modal, Pressable, Image, Animated as RNAnimated  } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { YStack, XStack } from 'tamagui';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, Search, Sparkles, XCircle, Trash2, ArrowLeft, MessageSquare, ArrowUpRight, ArrowDownLeft, X, FileText } from 'lucide-react-native';
@@ -455,13 +456,11 @@ export default function CallsScreen() {
           <RNText style={{ fontSize: 14, fontWeight: '500', color: isDark ? '#94a3b8' : '#64748b', marginTop: 8 }}>Your call history will appear here</RNText>
         </YStack>
       ) : (
-        <FlatList
+        <FlashList
+          estimatedItemSize={70}
           data={filteredLogs}
           keyExtractor={(item) => item.id || String(Math.random())}
           renderItem={({ item, index }) => renderRow(item, index)}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={7}
           removeClippedSubviews={Platform.OS === 'android'}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}

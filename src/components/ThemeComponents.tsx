@@ -117,74 +117,7 @@ export const GradientBackground = ({ children, style, ...props }: { children: Re
         </View>
       )}
 
-      {/* Animated Aurora Blobs */}
-      <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
-        
-        {/* Blob 1: Top Right — Indigo/Lavender */}
-        <AuroraBlob
-          color={isDark ? '#6366f1' : '#c7d2fe'}
-          fadeColor={isDark ? 'rgba(99, 102, 241, 0)' : 'rgba(199, 210, 254, 0)'}
-          size={width * 0.85}
-          posTop={-height * 0.08}
-          posRight={-width * 0.25}
-          opacity={isDark ? 0.08 : 0.5}
-          duration={7000}
-          delayMs={0}
-          direction={{ x: 0.5, y: 0.5, endX: 1, endY: 1 }}
-        />
-
-        {/* Blob 2: Bottom Left — Cyan/Sky */}
-        <AuroraBlob
-          color={isDark ? '#0ea5e9' : '#bae6fd'}
-          fadeColor={isDark ? 'rgba(14, 165, 233, 0)' : 'rgba(186, 230, 253, 0)'}
-          size={width * 0.8}
-          posBottom={-height * 0.05}
-          posLeft={-width * 0.2}
-          opacity={isDark ? 0.07 : 0.45}
-          duration={8000}
-          delayMs={500}
-          direction={{ x: 0.5, y: 0.5, endX: 0, endY: 0 }}
-        />
-
-        {/* Blob 3: Center Left — Purple/Violet */}
-        <AuroraBlob
-          color={isDark ? '#a855f7' : '#ddd6fe'}
-          fadeColor={isDark ? 'rgba(168, 85, 247, 0)' : 'rgba(221, 214, 254, 0)'}
-          size={width * 0.7}
-          posTop={height * 0.28}
-          posLeft={-width * 0.1}
-          opacity={isDark ? 0.06 : 0.4}
-          duration={9000}
-          delayMs={1000}
-          direction={{ x: 0.5, y: 0.5, endX: 0, endY: 1 }}
-        />
-
-        {/* Blob 4: Top Left — Emerald/Mint (NEW) */}
-        <AuroraBlob
-          color={isDark ? '#10b981' : '#a7f3d0'}
-          fadeColor={isDark ? 'rgba(16, 185, 129, 0)' : 'rgba(167, 243, 208, 0)'}
-          size={width * 0.6}
-          posTop={height * 0.05}
-          posLeft={-width * 0.15}
-          opacity={isDark ? 0.05 : 0.35}
-          duration={10000}
-          delayMs={1500}
-          direction={{ x: 0.5, y: 0.5, endX: 0, endY: 0 }}
-        />
-
-        {/* Blob 5: Bottom Right — Pink/Rose (NEW) */}
-        <AuroraBlob
-          color={isDark ? '#ec4899' : '#fecdd3'}
-          fadeColor={isDark ? 'rgba(236, 72, 153, 0)' : 'rgba(254, 205, 211, 0)'}
-          size={width * 0.55}
-          posBottom={height * 0.1}
-          posRight={-width * 0.1}
-          opacity={isDark ? 0.04 : 0.35}
-          duration={11000}
-          delayMs={2000}
-          direction={{ x: 0.5, y: 0.5, endX: 1, endY: 0 }}
-        />
-      </View>
+      
       {children}
     </YStack>
   );

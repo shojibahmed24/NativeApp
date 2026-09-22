@@ -4,8 +4,8 @@ import { useThemeContext } from '../../src/context/ThemeContext';
 import React, {  useState, useEffect, useCallback , useMemo } from 'react';
 import {  
   ScrollView, TextInput, TouchableOpacity, TouchableHighlight, View, Image,
-  StyleSheet, RefreshControl, Platform, Alert, Animated as RNAnimated, Dimensions
-, FlatList } from 'react-native';
+  StyleSheet, RefreshControl, Platform, Alert, Animated as RNAnimated, Dimensions } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { YStack, XStack, Text } from 'tamagui';
 import { Search, Edit, Archive, Trash2, MessageSquare, Image as ImageIcon, Mic, FileText, X, ArrowLeft } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -495,13 +495,11 @@ export default function MessagesScreen() {
           </Text>
         </Animated.View>
       ) : (
-        <FlatList
+        <FlashList
+  estimatedItemSize={80}
   data={filtered}
   keyExtractor={(item) => item.chatId || item.contact?.id || String(Math.random())}
   renderItem={({ item, index }) => renderRow(item, index)}
-  initialNumToRender={10}
-  maxToRenderPerBatch={10}
-  windowSize={7}
   removeClippedSubviews={Platform.OS === 'android'}
   showsVerticalScrollIndicator={false}
   refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}

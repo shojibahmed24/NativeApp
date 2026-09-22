@@ -5,7 +5,8 @@ import React, {  useState, useEffect, useCallback , useMemo } from 'react';
 import {  
   ScrollView, TextInput, TouchableOpacity, View, Image,
   StyleSheet, RefreshControl, Platform, Alert, Pressable, TouchableHighlight, Dimensions, ActivityIndicator
-, FlatList } from 'react-native';
+ } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { YStack, XStack, Text } from 'tamagui';
 import { Search, Phone, Video, UserPlus, Users, MessageSquare, Send, Quote, Settings, RefreshCw, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -547,13 +548,11 @@ export default function ContactsScreen() {
           </Text>
         </Animated.View>
       ) : (
-        <FlatList
+        <FlashList
+          estimatedItemSize={60}
           data={filtered}
           keyExtractor={(item) => item.id || String(Math.random())}
           renderItem={({ item, index }) => renderRow(item, index)}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={7}
           removeClippedSubviews={Platform.OS === 'android'}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadContacts(true)} tintColor="#6366f1" />}

@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { useState, useRef, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StyleSheet, ImageBackground, View, FlatList, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, Animated as RNAnimated, ScrollView, Modal, Clipboard,  } from 'react-native';
+import { StyleSheet, ImageBackground, View, TextInput, KeyboardAvoidingView, Platform, TouchableOpacity, Animated as RNAnimated, ScrollView, Modal, Clipboard,  } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 import { YStack, XStack, Text, Avatar, Spinner } from 'tamagui';
 import { ChevronLeft, Phone, Video, Send, Mic, Image as ImageIcon, Smile, Check, CheckCheck, Reply, Languages, X, Paperclip, Clock, FileText, Banknote, CheckSquare, Zap, SquareCheck, Square, Building, Wallet, Copy, QrCode, PlusCircle, Play , CheckCircle2, AlertCircle, Info, DollarSign, ListChecks } from 'lucide-react-native';
@@ -304,7 +305,7 @@ export default function ChatThreadScreen() {
   const [activePaymentMsg, setActivePaymentMsg] = useState<any>(null);
   const [recipient, setRecipient] = useState<any>(null);
   
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlashList<any>>(null);
   const [copiedRouting, setCopiedRouting] = useState(false);
   const [copiedAccount, setCopiedAccount] = useState(false);
   const [copiedCrypto, setCopiedCrypto] = useState(false);
@@ -609,7 +610,8 @@ export default function ChatThreadScreen() {
       </View>
 
       {/* Messages */}
-      <FlatList
+      <FlashList
+        estimatedItemSize={100}
         ref={flatListRef}
         data={chatMessages}
         keyExtractor={item => item.id}
