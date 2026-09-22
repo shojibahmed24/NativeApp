@@ -1,4 +1,5 @@
-import CryptoJS from 'crypto-js';
+import AES from 'crypto-js/aes';
+import Utf8 from 'crypto-js/enc-utf8';
 
 // Fallback Crypto API for HTTP contexts (local network testing)
 // Since window.crypto.subtle requires HTTPS, we use crypto-js for testing on local network IPs.
@@ -14,7 +15,7 @@ export const encryptMessage = async (text, myId, peerId) => {
   try {
     const secret = getSharedSecret(myId, peerId);
     // Encrypt using AES
-    const ciphertext = CryptoJS.AES.encrypt(text, secret).toString();
+    const ciphertext = AES.encrypt(text, secret).toString();
     // Prefix to identify it's crypto-js payload
     return 'CJS:' + ciphertext;
   } catch (err) {
@@ -54,8 +55,8 @@ export const decryptMessage = async (encryptedPayload, myId, peerId) => {
   try {
     const secret = getSharedSecret(myId, peerId);
     const ciphertext = encryptedPayload.replace('CJS:', '');
-    const bytes = CryptoJS.AES.decrypt(ciphertext, secret);
-    const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+    const bytes = AES.decrypt(ciphertext, secret);
+    const decrypted = bytes.toString(Utf8);
     
     if (!decrypted) return encryptedPayload;
     return decrypted;

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -190,7 +190,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   }, [socket]);
 
 
-  const markMessagesAsRead = async (chatId: string) => {
+  const markMessagesAsRead = useCallback(async (chatId: string) => {
     if (!user) return;
     try {
       setActiveChats(prev => {
@@ -204,10 +204,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (e) {
       console.error('Failed to mark read:', e);
     }
-  };
+  }, [user]);
 
-  
-  const updateMessageLocally = (chatId: string, messageId: string, updates: any) => {
+  const updateMessageLocally = useCallback((chatId: string, messageId: string, updates: any) => {
     setMessages(prev => {
       const updated = {
         ...prev,
@@ -216,9 +215,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       storage.set('@chat_messages', JSON.stringify(updated));
       return updated;
     });
-  };
+  }, []);
 
-  const deleteMessage = async (chatId: string, messageId: string) => {
+  const deleteMessage = useCallback(async (chatId: string, messageId: string) => {
     try {
       setMessages(prev => {
         const updated = {
@@ -232,9 +231,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (e) {
       console.error('Failed to delete message:', e);
     }
-  };
+  }, []);
 
-  const sendMessage = async (
+  const sendMessage = useCallback(async (
     chatId: string, 
     text: string, 
     type: 'text' | 'audio' | 'image' | 'document' | 'checklist' | 'money_request' = 'text', 
@@ -321,7 +320,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         [chatId]: (prev[chatId] || []).map(m => m.id === newMessageId ? { ...m, status: 'sent' } : m)
       }));
     }, 500);
-  };
+  }, [user]);
 
   
   const fetchRealMessages = useCallback(async (contactId: string) => {
@@ -358,7 +357,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user]);
 
-  const loadMoreMessages = async (chatId: string) => {
+  const loadMoreMessages = useCallback(async (chatId: string) => {
     if (!user) return;
     try {
       const currentMessages = messages[chatId] || [];
@@ -395,18 +394,18 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (e) {
       console.error('Failed to load more messages', e);
     }
-  };
+  }, [messages, user]);
 
-  const sendTypingEvent = (chatId: string, isTypingStatus: boolean) => {
+  const sendTypingEvent = useCallback((chatId: string, isTypingStatus: boolean) => {
     if (!socket) return;
     if (isTypingStatus) {
       socket.emit('typing:start', { receiverId: chatId, chatId });
     } else {
       socket.emit('typing:stop', { receiverId: chatId, chatId });
     }
-  };
+  }, [socket]);
 
-  const toggleChecklistItem = (chatId: string, messageId: string, itemId: number) => {
+  const toggleChecklistItem = useCallback((chatId: string, messageId: string, itemId: number) => {
     setMessages(prev => {
       const chatMsgs = prev[chatId] || [];
       const updatedMsgs = chatMsgs.map(m => {
@@ -422,16 +421,19 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       storage.set('@chat_messages', JSON.stringify(updated));
       return updated;
     });
-  };
+  }, [user]);
 
-  const addQuickReply = async (reply: string) => {
+  const addQuickReply = useCallback(async (reply: string) => {
     const newReplies = [...quickReplies, reply];
     setQuickReplies(newReplies);
     await AsyncStorage.setItem('@quick_replies', JSON.stringify(newReplies));
-  };
+  }, [quickReplies]);
 
   return (
-    <ChatContext.Provider value={{ activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally }}>
+    const contextValue = useMemo(() => ({ activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally }), [activeChats, messages, sendMessage, isTyping, onlineUsers, loadMoreMessages, sendTypingEvent, quickReplies, addQuickReply, toggleChecklistItem, loadConversations, loadingConversations, fetchRealMessages, markMessagesAsRead, deleteMessage, updateMessageLocally]);
+
+  return (
+    <ChatContext.Provider value={contextValue}>
       {children}
     </ChatContext.Provider>
   );

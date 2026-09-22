@@ -179,6 +179,7 @@ export default function MyProfileScreen() {
   const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
   const [loadingBlocks, setLoadingBlocks] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingWallpaper, setIsUploadingWallpaper] = useState(false);
   const [showBlockedList, setShowBlockedList] = useState(false);
 
   const [editNameModal, setEditNameModal] = useState(false);

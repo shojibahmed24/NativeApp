@@ -1,11 +1,11 @@
 import { GradientBackground } from '../../src/components/ThemeComponents';
 import { TOKENS } from '../../src/theme/tokens';
 import { useThemeContext } from '../../src/context/ThemeContext';
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
+import React, {  useState, useEffect, useCallback , useMemo } from 'react';
+import {  
   ScrollView, TextInput, TouchableOpacity, View, Image,
   StyleSheet, RefreshControl, Platform, Alert, Pressable, TouchableHighlight, Dimensions, ActivityIndicator
-} from 'react-native';
+, FlatList } from 'react-native';
 import { YStack, XStack, Text } from 'tamagui';
 import { Search, Phone, Video, UserPlus, Users, MessageSquare, Send, Quote, Settings, RefreshCw, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -279,11 +279,7 @@ export default function ContactsScreen() {
   const p5Y = useSharedValue(0);
 
   useEffect(() => {
-    p1Y.value = withRepeat(withTiming(-20, { duration: 4000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p2Y.value = withRepeat(withTiming(25, { duration: 5000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p3Y.value = withRepeat(withTiming(-30, { duration: 6000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p4Y.value = withRepeat(withTiming(15, { duration: 4500, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p5Y.value = withRepeat(withTiming(-25, { duration: 5500, easing: Easing.inOut(Easing.ease) }), -1, true);
+    
   }, []);
 
   const p1Style = useAnimatedStyle(() => ({ transform: [{ translateY: p1Y.value }] }));
@@ -476,7 +472,7 @@ export default function ContactsScreen() {
     );
   };
 
-  const styles = getStyles(isDark);
+  const styles = useMemo(() => getStyles(isDark), [isDark]);
 
   return (
     <GradientBackground style={styles.container}>
@@ -550,24 +546,29 @@ export default function ContactsScreen() {
           </Text>
         </Animated.View>
       ) : (
-        <ScrollView
-          style={{ flex: 1, zIndex: 5 }}
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id || String(Math.random())}
+          renderItem={({ item, index }) => renderRow(item, index)}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadContacts(true)} tintColor="#6366f1" />}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 100 }}
-        >
-          {/* Glassmorphic Count Badge */}
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', shadowColor: '#38bdf8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#0ea5e9', marginRight: 6 }} />
-              <Text style={{ fontSize: 12, color: '#0ea5e9', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                {contacts.length} UNICOM contact{contacts.length !== 1 ? 's' : ''}
-              </Text>
+          style={{ flex: 1, zIndex: 5 }}
+          ListHeaderComponent={
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', shadowColor: '#38bdf8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#0ea5e9', marginRight: 6 }} />
+                <Text style={{ fontSize: 12, color: '#0ea5e9', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {contacts.length} UNICOM contact{contacts.length !== 1 ? 's' : ''}
+                </Text>
+              </View>
             </View>
-          </View>
-
-          {filtered.map((contact, index) => renderRow(contact, index))}
-        </ScrollView>
+          }
+        />
       )}
 
 

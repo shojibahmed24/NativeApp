@@ -1,11 +1,11 @@
 import { GradientBackground } from '../../src/components/ThemeComponents';
 import { TOKENS } from '../../src/theme/tokens';
 import { useThemeContext } from '../../src/context/ThemeContext';
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
+import React, {  useState, useEffect, useCallback , useMemo } from 'react';
+import {  
   ScrollView, TextInput, TouchableOpacity, TouchableHighlight, View, Image,
   StyleSheet, RefreshControl, Platform, Alert, Animated as RNAnimated, Dimensions
-} from 'react-native';
+, FlatList } from 'react-native';
 import { YStack, XStack, Text } from 'tamagui';
 import { Search, Edit, Archive, Trash2, MessageSquare, Image as ImageIcon, Mic, FileText, X, ArrowLeft } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -67,10 +67,7 @@ const AnimatedAvatarRing = ({ children, status }: { children: React.ReactNode, s
   const ringRotation = useSharedValue(0);
   
   useEffect(() => {
-    ringRotation.value = withRepeat(
-      withTiming(360, { duration: status === 'online' ? 4000 : 6000, easing: Easing.linear }),
-      -1, false
-    );
+    ringRotation.value = 0; // Removed rotation
   }, []);
 
   const ringStyle = useAnimatedStyle(() => ({
@@ -239,7 +236,7 @@ export default function MessagesScreen() {
   const { user } = useAuth();
   const { socket } = useCall();
   const [conversations, setConversations] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
+  
   const [search, setSearch] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -254,11 +251,7 @@ export default function MessagesScreen() {
   const p5Y = useSharedValue(0);
 
   useEffect(() => {
-    p1Y.value = withRepeat(withTiming(-20, { duration: 4000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p2Y.value = withRepeat(withTiming(25, { duration: 5000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p3Y.value = withRepeat(withTiming(-30, { duration: 6000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p4Y.value = withRepeat(withTiming(15, { duration: 4500, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p5Y.value = withRepeat(withTiming(-25, { duration: 5500, easing: Easing.inOut(Easing.ease) }), -1, true);
+    
   }, []);
 
   const p1Style = useAnimatedStyle(() => ({ transform: [{ translateY: p1Y.value }] }));
@@ -272,7 +265,7 @@ export default function MessagesScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
          setConversations(prev => prev.filter(c => c.contact?.id !== id));
-         setFiltered(prev => prev.filter(c => c.contact?.id !== id));
+         
       } }
     ]);
   };
@@ -282,7 +275,7 @@ export default function MessagesScreen() {
       <View style={{ flexDirection: 'row', width: 140, marginBottom: 12, marginRight: 16, borderTopRightRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' }}>
         <TouchableOpacity style={{ flex: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }} onPress={() => {
           setConversations(prev => prev.filter(c => c.contact?.id !== id));
-          setFiltered(prev => prev.filter(c => c.contact?.id !== id));
+          
           api.archiveChat(id).catch(console.error);
         }}>
            <LinearGradient colors={TOKENS.GRADIENTS.GOLD} start={{x:0, y:0}} end={{x:1, y:1}} style={StyleSheet.absoluteFillObject} />
@@ -318,7 +311,7 @@ export default function MessagesScreen() {
            }));
         }
         setConversations(convs);
-        setFiltered(convs);
+        
       }
     } catch (e) {
       console.error('Failed to load conversations:', e);
@@ -338,10 +331,9 @@ export default function MessagesScreen() {
   }, [socket]);
 
   // Filter logic
-  useEffect(() => {
+  const filtered = useMemo(() => {
     let result = conversations;
     
-    // Apply category filter
     if (filter === 'unread') {
       result = result.filter(c => (c.unreadCount || 0) > 0);
     } else if (filter === 'groups') {
@@ -350,7 +342,6 @@ export default function MessagesScreen() {
       result = result.filter(c => c.isArchived);
     }
     
-    // Apply search filter
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(c => 
@@ -359,7 +350,7 @@ export default function MessagesScreen() {
       );
     }
     
-    setFiltered(result);
+    return result;
   }, [search, conversations, filter]);
 
   const onRefresh = () => loadConversations(true);
@@ -441,7 +432,7 @@ export default function MessagesScreen() {
     );
   };
 
-  const styles = getStyles(isDark);
+  const styles = useMemo(() => getStyles(isDark), [isDark]);
 
   return (
     <GradientBackground style={styles.container}>
@@ -504,14 +495,19 @@ export default function MessagesScreen() {
           </Text>
         </Animated.View>
       ) : (
-        <ScrollView
-          style={{ flex: 1, zIndex: 5 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 100 }}
-        >
-          {filtered.map((conv, index) => renderRow(conv, index))}
-        </ScrollView>
+        <FlatList
+  data={filtered}
+  keyExtractor={(item) => item.chatId || item.contact?.id || String(Math.random())}
+  renderItem={({ item, index }) => renderRow(item, index)}
+  initialNumToRender={10}
+  maxToRenderPerBatch={10}
+  windowSize={7}
+  removeClippedSubviews={Platform.OS === 'android'}
+  showsVerticalScrollIndicator={false}
+  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}
+  contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 100 }}
+  style={{ flex: 1, zIndex: 5 }}
+/>
       )}
 
 

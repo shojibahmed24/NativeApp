@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import io from 'socket.io-client/dist/socket.io.js';
 import { api, SOCKET_URL } from '../services/api';
 import { useAuth } from './AuthContext';
@@ -14,7 +14,7 @@ export const CallProvider = ({ children }) => {
 
   const [activeCall, setActiveCall] = useState(null); // active call object
   const [incomingCall, setIncomingCall] = useState(null); // incoming call offer
-  const [callDuration, setCallDuration] = useState(0);
+  const callStartTimeRef = useRef<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [translationStatus, setTranslationStatus] = useState('ready'); // ready, listening, interpreting, speaking, interrupted
@@ -48,6 +48,7 @@ export const CallProvider = ({ children }) => {
   // Handle Audio Hardware Routing
   useEffect(() => {
     const updateAudioMode = async () => {
+      if (!activeCall) return;
       try {
         await setAudioModeAsync({
           allowsRecording: true,
@@ -93,9 +94,7 @@ export const CallProvider = ({ children }) => {
     socketRef.current.on('call:connected', () => {
         stopTone();
         setTranslationStatus('ready');
-        if (!timerRef.current) {
-          timerRef.current = setInterval(() => setCallDuration((prev) => prev + 1), 1000);
-        }
+        callStartTimeRef.current = Date.now();
     });
 
     const handleCallTermination = () => {
@@ -104,11 +103,8 @@ export const CallProvider = ({ children }) => {
       setActiveCall(null);
       activeCallRef.current = null;
       setIncomingCall(null);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      setCallDuration(0);
+      
+      
       setTranslationStatus('ready');
       setLastTranslatedSpeech(null);
     };
@@ -130,10 +126,7 @@ export const CallProvider = ({ children }) => {
 
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
-      if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+      
     };
   }, [user]);
 
@@ -155,7 +148,7 @@ export const CallProvider = ({ children }) => {
 
       setActiveCall(callData);
     activeCallRef.current = callData;
-        setCallDuration(0);
+        
         setTranslationStatus('ready');
         startDialingTone();
 
@@ -213,10 +206,7 @@ export const CallProvider = ({ children }) => {
         isVideo: incomingCall.isVideo
       });
 
-      setCallDuration(0);
-      timerRef.current = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
+      callStartTimeRef.current = Date.now();
 
       socketRef.current?.emit('call:answer', {
         callId: incomingCall.callId,
@@ -423,10 +413,8 @@ export const CallProvider = ({ children }) => {
   };
 
   const endCurrentCall = async () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    const currentDuration = callStartTimeRef.current ? Math.floor((Date.now() - callStartTimeRef.current) / 1000) : 0;
+    
     if (Platform.OS === 'web' && window.speechSynthesis) window.speechSynthesis.cancel();
     if (activeAudioSourceRef.current) {
       activeAudioSourceRef.current.stop();
@@ -436,7 +424,7 @@ export const CallProvider = ({ children }) => {
 
     if (activeCall) {
       try {
-        await api.endCall(activeCall.id, callDuration, callLatency);
+        await api.endCall(activeCall.id, currentDuration, callLatency);
       } catch (err) {
         console.error('Failed to end call in backend:', err);
       } finally {
@@ -444,7 +432,7 @@ export const CallProvider = ({ children }) => {
           socketRef.current?.emit('call:end', {
             callId: activeCall.id,
             peerId: activeCall.peer?.id,
-            durationSeconds: callDuration,
+            durationSeconds: currentDuration,
             avgLatencyMs: callLatency
           });
         }
@@ -455,17 +443,16 @@ export const CallProvider = ({ children }) => {
     stopTone();
     setActiveCall(null);
     activeCallRef.current = null;
-    setCallDuration(0);
+    
     setLastTranslatedSpeech(null);
     setTranslationStatus('ready');
   };
 
   return (
-    <CallContext.Provider
-              value={{
+    const contextValue = useMemo(() => ({
         activeCall,
         incomingCall,
-        callDuration,
+        callStartTime: callStartTimeRef.current,
         isMuted,
         setIsMuted,
         isSpeakerOn,
@@ -483,8 +470,10 @@ export const CallProvider = ({ children }) => {
         speakInCall,
         triggerBargeIn,
         socket: socketRef.current
-      }}
-    >
+      }), [activeCall, incomingCall, isMuted, isSpeakerOn, translationStatus, lastTranslatedSpeech, callLatency, callHistory, startVoiceCall, startVideoCall, toggleVideo, acceptIncomingCall, rejectIncomingCall, endCurrentCall, speakInCall, triggerBargeIn, socketRef.current]);
+
+  return (
+    <CallContext.Provider value={contextValue}>
       {children}
     </CallContext.Provider>
   );

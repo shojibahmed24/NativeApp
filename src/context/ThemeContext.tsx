@@ -15,7 +15,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const systemColorScheme = useColorScheme();
   const [theme, setThemeState] = useState<ThemeType>('dark');
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(true);
 
   useEffect(() => {
     const loadTheme = async () => {
@@ -44,7 +44,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   const isDark = theme === 'system' ? systemColorScheme === 'dark' : theme === 'dark';
 
-  if (!isReady) return null;
+  
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, isDark }}>

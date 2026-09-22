@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect } from 'react';
 import { Platform, StyleSheet, Dimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';

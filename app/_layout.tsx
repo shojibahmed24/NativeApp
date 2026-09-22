@@ -13,7 +13,7 @@ import * as Sentry from "@sentry/react-native";
 if (process.env.EXPO_PUBLIC_SENTRY_DSN && process.env.EXPO_PUBLIC_SENTRY_DSN.startsWith('http')) {
   Sentry.init({
     dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    tracesSampleRate: 1.0,
+    tracesSampleRate: 0.1,
   });
 }
 

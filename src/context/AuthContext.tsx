@@ -33,7 +33,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const seen = await AsyncStorage.getItem('has_seen_onboarding');
       if (seen === 'true') setHasSeenOnboarding(true);
     registerForPushNotificationsAsync();
-    registerForPushNotificationsAsync();
     } catch (err: any) {
       if (err.code === 'DEVICE_SESSION_TERMINATED') {
         setSessionError('Your account was logged in on another device. UNICOM allows 1 primary active device for security.');

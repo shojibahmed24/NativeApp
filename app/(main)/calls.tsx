@@ -1,8 +1,8 @@
 import { GradientBackground } from '../../src/components/ThemeComponents';
 import { TOKENS } from '../../src/theme/tokens';
 import { useThemeContext } from '../../src/context/ThemeContext';
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, TextInput, TouchableOpacity, Text as RNText, StyleSheet, RefreshControl, Dimensions, Alert, Platform, KeyboardAvoidingView, ScrollView, Modal, Pressable, Image, Animated as RNAnimated } from 'react-native';
+import React, {  useState, useEffect, useCallback , useMemo } from 'react';
+import {  View, TextInput, TouchableOpacity, Text as RNText, StyleSheet, RefreshControl, Dimensions, Alert, Platform, KeyboardAvoidingView, ScrollView, Modal, Pressable, Image, Animated as RNAnimated , FlatList } from 'react-native';
 import { YStack, XStack } from 'tamagui';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, Search, Sparkles, XCircle, Trash2, ArrowLeft, MessageSquare, ArrowUpRight, ArrowDownLeft, X, FileText } from 'lucide-react-native';
@@ -175,7 +175,7 @@ const LoadingSkeleton = () => {
 
 export default function CallsScreen() {
   const { isDark } = useThemeContext();
-  const styles = getStyles(isDark);
+  const styles = useMemo(() => getStyles(isDark), [isDark]);
   const { user } = useAuth();
   const { startVoiceCall } = useCall();
   const router = useRouter();
@@ -200,13 +200,7 @@ export default function CallsScreen() {
 
   useEffect(() => {
     fetchCallLogs();
-    checkMissedCalls();
     
-    p1Y.value = withRepeat(withTiming(-20, { duration: 4000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p2Y.value = withRepeat(withTiming(25, { duration: 5000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p3Y.value = withRepeat(withTiming(-30, { duration: 6000, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p4Y.value = withRepeat(withTiming(15, { duration: 4500, easing: Easing.inOut(Easing.ease) }), -1, true);
-    p5Y.value = withRepeat(withTiming(-25, { duration: 5500, easing: Easing.inOut(Easing.ease) }), -1, true);
   }, []);
 
   const p1Style = useAnimatedStyle(() => ({ transform: [{ translateY: p1Y.value }] }));
@@ -218,8 +212,23 @@ export default function CallsScreen() {
   const fetchCallLogs = async () => {
     try {
       const res = await api.getCallHistory();
+      const historyList = res.calls || res.history || [];
       if (res.success) {
-        setLogs(res.calls || res.history || []);
+        setLogs(historyList);
+        
+        const stored = await AsyncStorage.getItem("@call_history_last_checked");
+        const lastChecked = stored ? new Date(stored) : new Date(0);
+        let newMissed = 0;
+        
+        historyList.forEach((log: any) => {
+          if (log.status === "missed" && log.direction === "incoming") {
+            const logDate = new Date(log.createdAt);
+            if (logDate > lastChecked) {
+              newMissed++;
+            }
+          }
+        });
+        setMissedCount(newMissed);
       }
     } catch (e) {
       console.warn("Failed to fetch call logs");
@@ -234,29 +243,7 @@ export default function CallsScreen() {
     fetchCallLogs();
   };
 
-  const checkMissedCalls = async () => {
-    try {
-      const stored = await AsyncStorage.getItem("@call_history_last_checked");
-      const lastChecked = stored ? new Date(stored) : new Date(0);
-      let newMissed = 0;
-      
-      const res = await api.getCallHistory();
-      const historyList = res.calls || res.history || [];
-      if (res.success && historyList) {
-        historyList.forEach((log: any) => {
-          if (log.status === "missed" && log.direction === "incoming") {
-            const logDate = new Date(log.createdAt);
-            if (logDate > lastChecked) {
-              newMissed++;
-            }
-          }
-        });
-        setMissedCount(newMissed);
-      }
-    } catch (e) {}
-  };
-
-  const markMissedAsSeen = async () => {
+    const markMissedAsSeen = async () => {
     if (missedCount > 0) {
       await AsyncStorage.setItem("@call_history_last_checked", new Date().toISOString());
       setMissedCount(0);
@@ -468,15 +455,20 @@ export default function CallsScreen() {
           <RNText style={{ fontSize: 14, fontWeight: '500', color: isDark ? '#94a3b8' : '#64748b', marginTop: 8 }}>Your call history will appear here</RNText>
         </YStack>
       ) : (
-        <ScrollView 
-          style={{ flex: 1, zIndex: 5 }}
-          contentContainerStyle={styles.scrollContent}
+        <FlatList
+          data={filteredLogs}
+          keyExtractor={(item) => item.id || String(Math.random())}
+          renderItem={({ item, index }) => renderRow(item, index)}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}
-        >
-          {filteredLogs.map((log, index) => renderRow(log, index))}
-          <View style={{ height: 100 }} />
-        </ScrollView>
+          contentContainerStyle={styles.scrollContent}
+          style={{ flex: 1, zIndex: 5 }}
+          ListFooterComponent={<View style={{ height: 100 }} />}
+        />
       )}
 
       {/* Context Menu Modal */}

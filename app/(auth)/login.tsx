@@ -80,13 +80,11 @@ export default function LoginScreen() {
         } else {
           // Legacy user with no password, send OTP
           const res = await loginWithPhone(fullNumber, 'sms');
-          if (res && res.otpCode) { console.log('%c [DEV OTP RECEIVED]: ' + res.otpCode, 'color: #00ff00; font-size: 16px; font-weight: bold;'); }
           router.push({ pathname: '/(auth)/otp', params: { phone: fullNumber } });
         }
       } else {
         // New user, send OTP for registration
         const res = await loginWithPhone(fullNumber, 'sms');
-        if (res && res.otpCode) { console.log('%c [DEV OTP RECEIVED]: ' + res.otpCode, 'color: #00ff00; font-size: 16px; font-weight: bold;'); }
         router.push({ pathname: '/(auth)/otp', params: { phone: fullNumber } });
       }
       
