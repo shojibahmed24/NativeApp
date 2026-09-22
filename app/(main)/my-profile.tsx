@@ -442,7 +442,7 @@ export default function MyProfileScreen() {
 
             {/* ─── AI QUOTA ─── */}
             <Animated.View entering={SlideInRight.delay(80).springify()}>
-              <View style={[styles.quotaCard, { shadowColor: '#6366f1', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 4 }]}>
+              <View style={[styles.quotaCard, { shadowColor: isDark ? '#818cf8' : '#6366f1', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 4 }]}>
                 <XStack alignItems="center" space="$2" marginBottom={12}>
                   <Sparkles color="#7c3aed" size={18} />
                   <Text fontWeight="800" fontSize={15} color={TOKENS.COLORS.TEXT_PRIMARY}>AI Translation Quota</Text>
@@ -893,7 +893,7 @@ const styles = StyleSheet.create({
   // Name area
   nameArea: { alignItems: 'center', paddingHorizontal: 24, marginTop: 14, marginBottom: 4 },
   planBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: TOKENS.RADIUS.SM },
-  bioChip: { flexDirection: 'row', alignItems: 'center', borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 16, paddingVertical: 10, marginTop: 10, maxWidth: SCREEN_WIDTH - 64, shadowColor: '#6366f1', shadowOpacity: 0.05, shadowOffset: {width:0,height:2}, shadowRadius: 4, overflow: 'hidden' },
+  bioChip: { flexDirection: 'row', alignItems: 'center', borderRadius: TOKENS.RADIUS.MD, paddingHorizontal: 16, paddingVertical: 10, marginTop: 10, maxWidth: SCREEN_WIDTH - 64, shadowColor: isDark ? '#818cf8' : '#6366f1', shadowOpacity: 0.05, shadowOffset: {width:0,height:2}, shadowRadius: 4, overflow: 'hidden' },
   // Stats
   statsRow: { flexDirection: 'row', backgroundColor: 'transparent', marginHorizontal: 16, marginTop: 16, borderRadius: TOKENS.RADIUS.LG, padding: 20, ...TOKENS.SHADOWS.SUBTLE, overflow: 'hidden' },
   statItem: { flex: 1, alignItems: 'center' },
