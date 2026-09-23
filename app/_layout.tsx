@@ -1,11 +1,12 @@
 // @ts-nocheck
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-get-random-values';
-import { Platform, useColorScheme, Text, View as RNView, Text as RNText, useWindowDimensions } from 'react-native';
+import { Platform, LogBox, useColorScheme, Text, View as RNView, Text as RNText, useWindowDimensions } from 'react-native';
 import React, { useEffect } from 'react';
 if (Platform.OS === 'web') {
   require('./global.css');
 }
+LogBox.ignoreLogs(['Exceeded max renders without commit']);
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TamaguiProvider, Theme, YStack, Spinner, View } from 'tamagui'
 import { Stack, useRouter, useSegments } from 'expo-router'
@@ -159,3 +160,4 @@ function RootLayout() {
 
 const hasSentry = process.env.EXPO_PUBLIC_SENTRY_DSN && process.env.EXPO_PUBLIC_SENTRY_DSN.startsWith('http');
 export default hasSentry ? Sentry.wrap(RootLayout) : RootLayout;
+
