@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { CallProvider } from '../../src/context/CallContext';
 import { ChatProvider } from '../../src/context/ChatContext';
-import CallKeepService from '../../src/services/CallKeepService';
+import * as CallKeepService from '../../src/services/CallKeepService';
 import IncomingCallModal from '../../src/components/IncomingCallModal';
 
 import { Tabs } from 'expo-router';
