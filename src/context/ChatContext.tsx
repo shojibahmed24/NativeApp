@@ -27,6 +27,7 @@ import { api } from '../services/api';
 import { useAuth } from './AuthContext';
 import { useCall } from './CallContext';
 import { uploadMediaToSupabase } from '../utils/storageUtils';
+import { saveMessagesToDB, getMessagesFromDB, initDB } from '../database/sqlite';
 
 
 export const useChatStore = create<any>((set, get) => ({
