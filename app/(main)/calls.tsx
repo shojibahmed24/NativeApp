@@ -460,7 +460,7 @@ export default function CallsScreen() {
         <FlashList
           estimatedItemSize={70}
           data={filteredLogs}
-          keyExtractor={(item) => item.id || String(Math.random())}
+          keyExtractor={(item, index) => item.id || String(index)}
           renderItem={({ item, index }) => renderRow(item, index)}
           removeClippedSubviews={Platform.OS === 'android'}
           showsVerticalScrollIndicator={false}

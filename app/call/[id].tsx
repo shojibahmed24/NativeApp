@@ -108,7 +108,7 @@ export default function CallScreen() {
     lastTranslatedSpeech,
       socket,
       toggleVideo
-    } = useCall();
+    } = useCallStore();
 
   const isMutedRef = React.useRef(isMuted);
   React.useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
@@ -400,3 +400,4 @@ export function ErrorBoundary({ error, retry }: any) {
     </View>
   );
 }
+

@@ -552,7 +552,7 @@ export default function ContactsScreen() {
         <FlashList
           estimatedItemSize={60}
           data={filtered}
-          keyExtractor={(item) => item.id || String(Math.random())}
+          keyExtractor={(item, index) => item.id || String(index)}
           renderItem={({ item, index }) => renderRow(item, index)}
           removeClippedSubviews={Platform.OS === 'android'}
           showsVerticalScrollIndicator={false}

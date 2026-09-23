@@ -5,7 +5,7 @@ import { YStack, XStack, Text } from 'tamagui';
 import { Phone, Delete, AlertCircle, PhoneCall } from 'lucide-react-native';
 import { GlassCard } from '../src/components/ThemeComponents';
 import { useRouter } from 'expo-router';
-import { useCall } from '../src/context/CallContext';
+import { useCallStore } from '../src/context/CallContext';
 import { useThemeContext } from '../src/context/ThemeContext';
 import { api } from '../src/services/api';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -112,7 +112,7 @@ const DialButton = ({ number, letters, onPress, onLongPress, index, isDark }: an
 
 export default function DialpadModal() {
   const router = useRouter();
-  const { startVoiceCall } = useCall();
+  const startVoiceCall = useCallStore(s => s.startVoiceCall);
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeContext();
   

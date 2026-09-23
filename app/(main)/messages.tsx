@@ -499,7 +499,7 @@ export default function MessagesScreen() {
         <FlashList
   estimatedItemSize={80}
   data={filtered}
-  keyExtractor={(item) => item.chatId || item.contact?.id || String(Math.random())}
+  keyExtractor={(item, index) => item.chatId || item.contact?.id || String(index)}
   renderItem={({ item, index }) => renderRow(item, index)}
   removeClippedSubviews={Platform.OS === 'android'}
   showsVerticalScrollIndicator={false}
