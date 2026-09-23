@@ -503,14 +503,30 @@ export const CallProvider = ({ children }) => {
     socket: socketRef.current
   }), [activeCall, incomingCall, isMuted, isSpeakerOn, translationStatus, lastTranslatedSpeech, callLatency, callHistory]);
 
+    const stateRefs = useRef<any>({});
+  
+  useEffect(() => {
+    stateRefs.current = {
+      startVoiceCall, startVideoCall, toggleVideo, acceptIncomingCall, rejectIncomingCall, endCurrentCall, triggerBargeIn,
+      socket: socketRef.current, callStartTime: callStartTimeRef.current
+    };
+  });
+
   useEffect(() => {
     setFunctions({
-      startVoiceCall, startVideoCall, toggleVideo, acceptIncomingCall, rejectIncomingCall, endCurrentCall, speakInCall, triggerBargeIn,
-      socket: socketRef.current,
-      callStartTime: callStartTimeRef.current,
+      startVoiceCall: (...args: any[]) => stateRefs.current.startVoiceCall?.(...args),
+      startVideoCall: (...args: any[]) => stateRefs.current.startVideoCall?.(...args),
+      toggleVideo: (...args: any[]) => stateRefs.current.toggleVideo?.(...args),
+      acceptIncomingCall: (...args: any[]) => stateRefs.current.acceptIncomingCall?.(...args),
+      rejectIncomingCall: (...args: any[]) => stateRefs.current.rejectIncomingCall?.(...args),
+      endCurrentCall: (...args: any[]) => stateRefs.current.endCurrentCall?.(...args),
+      triggerBargeIn: (...args: any[]) => stateRefs.current.triggerBargeIn?.(...args),
+      speakInCall,
+      get socket() { return stateRefs.current.socket; },
+      get callStartTime() { return stateRefs.current.callStartTime; },
       setIsMuted, setIsSpeakerOn
     });
-  }, [setFunctions, startVoiceCall, startVideoCall, toggleVideo, acceptIncomingCall, rejectIncomingCall, endCurrentCall, speakInCall, triggerBargeIn, socketRef.current, callStartTimeRef.current, setIsMuted, setIsSpeakerOn]);
+  }, [setFunctions, speakInCall, setIsMuted, setIsSpeakerOn]);
 
 
   return (
